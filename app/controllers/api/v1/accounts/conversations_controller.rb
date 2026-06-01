@@ -156,15 +156,16 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   end
 
   def update_last_seen_on_conversation(last_seen_at, update_assignee)
-    updates = { agent_last_seen_at: last_seen_at }
-    updates[:assignee_last_seen_at] = last_seen_at if update_assignee.present?
+  updates = { agent_last_seen_at: last_seen_at }
+  updates[:assignee_last_seen_at] = last_seen_at if update_assignee.present?
 
-    # rubocop:disable Rails/SkipsModelValidations
-    @conversation.update_columns(updates)
-    # rubocop:enable Rails/SkipsModelValidations
+  # rubocop:disable Rails/SkipsModelValidations
+  @conversation.update_columns(updates)
+  # rubocop:enable Rails/SkipsModelValidations
 
-    ::Conversations::UnreadCounts::Notifier.new(@conversation).perform
-  end
+  ::Conversations::UnreadCounts::Notifier.new(@conversation).perform
+  Rails.configuration.dispatcher.dispatch(CONVERSATION_READ, Time.zone.now, conversation: @conversation, user: Current.user)
+end
 
   def should_update_last_seen?
     # Update if at least one relevant timestamp is older than 1 hour or not set

@@ -112,20 +112,25 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     head :ok
   end
 
-  def update_last_seen
-    # High-traffic accounts generate excessive DB writes when agents frequently switch between conversations.
-    # Throttle last_seen updates to once per hour when there are no unread messages to reduce DB load.
-    # Always update immediately if there are unread messages to maintain accurate read/unread state.
-    # Visiting a conversation should clear any unread inbox notifications for this conversation.
-    Notification::MarkConversationReadService.new(user: Current.user, account: Current.account, conversation: @conversation).perform
-    return update_last_seen_on_conversation(DateTime.now.utc, true) if assignee? && @conversation.assignee_unread_messages.any?
-    return update_last_seen_on_conversation(DateTime.now.utc, false) if !assignee? && @conversation.unread_messages.any?
-
-    # No unread messages - apply throttling to limit DB writes
-    return unless should_update_last_seen?
-
-    update_last_seen_on_conversation(DateTime.now.utc, assignee?)
+def update_last_seen
+  # High-traffic accounts generate excessive DB writes when agents frequently switch between conversations.
+  # Throttle last_seen updates to once per hour when there are no unread messages to reduce DB load.
+  # Always update immediately if there are unread messages to maintain accurate read/unread state.
+  # Visiting a conversation should clear any unread inbox notifications for this conversation.
+  Notification::MarkConversationReadService.new(user: Current.user, account: Current.account, conversation: @conversation).perform
+  if @conversation.unread_messages.any?
+    cache_key = "conversation_read_#{@conversation.id}_#{Current.user.id}"
+    unless Rails.cache.read(cache_key)
+      Rails.cache.write(cache_key, true, expires_in: 30.seconds)
+      Rails.configuration.dispatcher.dispatch(CONVERSATION_READ, Time.zone.now, conversation: @conversation, user: Current.user)
+    end
   end
+  return update_last_seen_on_conversation(DateTime.now.utc, true) if assignee? && @conversation.assignee_unread_messages.any?
+  return update_last_seen_on_conversation(DateTime.now.utc, false) if !assignee? && @conversation.unread_messages.any?
+  # No unread messages - apply throttling to limit DB writes
+  return unless should_update_last_seen?
+  update_last_seen_on_conversation(DateTime.now.utc, assignee?)
+end
 
   def unread
     last_incoming_message = @conversation.messages.incoming.last

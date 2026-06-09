@@ -27,6 +27,7 @@ class WebhookListener < BaseListener
   inbox = conversation.inbox
   payload = conversation.webhook_data.merge(event: __method__.to_s)
   deliver_webhook_payloads(payload, inbox)
+  send_whatsapp_read_receipt(conversation, inbox)
 end
 
   def message_created(event)
@@ -136,4 +137,41 @@ end
     deliver_account_webhooks(payload, inbox.account)
     deliver_api_inbox_webhooks(payload, inbox)
   end
+
+  def deliver_webhook_payloads(payload, inbox)
+    deliver_account_webhooks(payload, inbox.account)
+    deliver_api_inbox_webhooks(payload, inbox)
+  end
+
+  def send_whatsapp_read_receipt(conversation, inbox)
+    return unless inbox.channel_type == 'Channel::Whatsapp'
+    return unless inbox.channel.provider == 'whatsapp_cloud'
+
+    last_incoming = conversation.messages.incoming.last
+    return if last_incoming.blank?
+
+    source_id = last_incoming.source_id
+    return if source_id.blank?
+
+    channel = inbox.channel
+    api_key = channel.provider_config['api_key']
+    phone_number_id = channel.provider_config['phone_number_id']
+    base_url = ENV.fetch('WHATSAPP_CLOUD_BASE_URL', 'https://graph.facebook.com')
+
+    HTTParty.post(
+      "#{base_url}/v13.0/#{phone_number_id}/messages",
+      headers: {
+        'Authorization' => "Bearer #{api_key}",
+        'Content-Type' => 'application/json'
+      },
+      body: {
+        messaging_product: 'whatsapp',
+        status: 'read',
+        message_id: source_id
+      }.to_json
+    )
+  rescue StandardError => e
+    Rails.logger.error "WhatsApp read receipt failed: #{e.message}"
+  end
+end
 end

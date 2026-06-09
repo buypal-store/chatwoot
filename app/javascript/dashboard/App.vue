@@ -84,10 +84,24 @@ export default {
     this.setLocale(
       this.uiSettings?.locale || window.chatwootConfig.selectedLocale
     );
+    // Ocultar mensajes de actividad de prioridad
+    const hideActivityMsgs = () => {
+      document.querySelectorAll('.message-bubble-container.justify-center').forEach(el => {
+        if (el.textContent?.includes('prioridad') || el.textContent?.includes('priority')) {
+          el.style.display = 'none';
+        }
+      });
+    };
+    this._priorityObserver = new MutationObserver(hideActivityMsgs);
+    this._priorityObserver.observe(document.body, { childList: true, subtree: true });
+    hideActivityMsgs();
   },
   unmounted() {
     if (this.reconnectService) {
       this.reconnectService.disconnect();
+    }
+    if (this._priorityObserver) {
+      this._priorityObserver.disconnect();
     }
   },
   methods: {

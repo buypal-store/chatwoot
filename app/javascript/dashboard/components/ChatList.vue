@@ -546,7 +546,20 @@ function onToggleAdvanceFiltersModal() {
 
   showAdvancedFilters.value = true;
 }
-
+function onUrgentFilter() {
+  const urgentPayload = [{
+    attributeKey: 'priority',
+    attributeModel: 'standard',
+    customAttributeType: '',
+    filterOperator: 'equal_to',
+    queryOperator: null,
+    values: [{ id: 'urgent', name: 'Urgent' }],
+  }];
+  store.dispatch('conversationPage/reset');
+  store.dispatch('emptyAllConversations');
+  store.dispatch('setConversationFilters', urgentPayload);
+  fetchFilteredConversations(urgentPayload);
+}
 function fetchConversations() {
   store.dispatch('updateChatListFilters', conversationFilters.value);
   store.dispatch('fetchAllConversations').then(emitConversationLoaded);
@@ -884,6 +897,7 @@ watch(conversationFilters, (newVal, oldVal) => {
       @filters-modal="onToggleAdvanceFiltersModal"
       @reset-filters="resetAndFetchData"
       @basic-filter-change="onBasicFilterChange"
+      @urgent-filter="onUrgentFilter"
     />
 
     <TeleportWithDirection

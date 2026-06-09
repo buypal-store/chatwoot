@@ -141,7 +141,7 @@ const toggleConversationLayout = () => {
       </template>
       <NextButton
         v-tooltip.right="'Solo urgentes 🔥'"
-        icon="i-lucide-flame"
+        icon="i-lucide-message-circle-more"
         slate
         xs
         faded

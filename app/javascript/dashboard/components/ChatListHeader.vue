@@ -24,6 +24,7 @@ const emit = defineEmits([
   'resetFilters',
   'basicFilterChange',
   'filtersModal',
+  'urgentFilter',
 ]);
 
 const { uiSettings, updateUISettings } = useUISettings();
@@ -138,6 +139,14 @@ const toggleConversationLayout = () => {
           @click="emit('deleteFolders')"
         />
       </template>
+      <NextButton
+        v-tooltip.right="'Solo urgentes 🔥'"
+        icon="i-lucide-flame"
+        slate
+        xs
+        faded
+        @click="emit('urgentFilter')"
+      />
       <div v-else class="relative">
         <NextButton
           id="toggleConversationFilterButton"

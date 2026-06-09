@@ -20,7 +20,19 @@ const props = defineProps({
 
 const router = useRouter();
 const store = useStore();
+  
+// Colores por equipo
+const TEAM_COLORS = {
+  1: '#EF4444', // sento home — rojo
+  2: '#3B82F6', // buypal — azul
+  3: '#EC4899', // babypal — rosa
+};
 
+const teamColor = computed(() => {
+  const teamId = props.source?.meta?.team?.id;
+  return TEAM_COLORS[teamId] || null;
+});
+  
 const selectConversation = inject('selectConversation');
 const deSelectConversation = inject('deSelectConversation');
 const assignAgent = inject('assignAgent');
@@ -191,7 +203,7 @@ const formatTime = ts => {
 </script>
 
 <template>
-  <div class="conv-item-wrap">
+  <div class="conv-item-wrap" :style="teamColor ? { borderLeft: `3px solid ${teamColor}` } : {}">
     <!-- Expanded layout -->
     <ConversationCardExpanded
       v-if="showExpanded"

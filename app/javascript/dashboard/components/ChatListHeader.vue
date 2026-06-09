@@ -112,7 +112,7 @@ const toggleConversationLayout = () => {
           @click="emit('resetFilters')"
         />
       </template>
-      <template v-if="hasActiveFolders">
+      <div v-if="hasActiveFolders" class="flex gap-1">
         <div class="relative">
           <NextButton
             id="toggleConversationFilterButton"
@@ -138,16 +138,16 @@ const toggleConversationLayout = () => {
           faded
           @click="emit('deleteFolders')"
         />
-      </template>
-      <NextButton
-        v-tooltip.right="'Solo urgentes 🔥'"
-        icon="i-lucide-message-circle-more"
-        slate
-        xs
-        faded
-        @click="emit('urgentFilter')"
-      />
-      <div v-else class="relative">
+      </div>
+      <div v-else class="relative flex gap-1">
+        <NextButton
+          v-tooltip.right="'Urgentes sin responder'"
+          icon="i-lucide-message-circle-more"
+          slate
+          xs
+          faded
+          @click="emit('urgentFilter')"
+        />
         <NextButton
           id="toggleConversationFilterButton"
           v-tooltip.right="$t('FILTER.TOOLTIP_LABEL')"

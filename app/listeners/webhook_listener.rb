@@ -139,12 +139,7 @@ end
     deliver_account_webhooks(payload, inbox.account)
     deliver_api_inbox_webhooks(payload, inbox)
   end
-
-  def deliver_webhook_payloads(payload, inbox)
-    deliver_account_webhooks(payload, inbox.account)
-    deliver_api_inbox_webhooks(payload, inbox)
-  end
-
+  
   def send_whatsapp_read_receipt(conversation, inbox)
     return unless inbox.channel_type == 'Channel::Whatsapp'
     return unless inbox.channel.provider == 'whatsapp_cloud'
@@ -176,4 +171,4 @@ end
     Rails.logger.error "WhatsApp read receipt failed: #{e.message}"
   end
 end
-end
+

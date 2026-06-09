@@ -161,6 +161,16 @@ const copyConversationId = async () => {
             {{ snoozedDisplayText }}
           </span>
         </div>
+        <!-- Etiquetas -->
+        <div v-if="chat.labels && chat.labels.length" class="flex flex-wrap gap-1 mt-0.5">
+          <span
+            v-for="label in chat.labels"
+            :key="label"
+            class="text-xxs px-1.5 py-0.5 rounded-full bg-n-alpha-1 text-n-slate-11 border border-n-slate-4"
+          >
+            {{ label }}
+          </span>
+        </div>
       </div>
     </div>
     <div

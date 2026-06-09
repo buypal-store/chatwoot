@@ -167,7 +167,7 @@ const actions = {
         conversationId,
         messageId: null,
       });
-      dispatch('markMessagesRead', { id: conversationId }, { root: true });
+      //dispatch('markMessagesRead', { id: conversationId }, { root: true });
     } catch (error) {
       // Handle error
     }

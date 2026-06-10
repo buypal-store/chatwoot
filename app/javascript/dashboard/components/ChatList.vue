@@ -575,10 +575,11 @@ function onUrgentFilter() {
     queryOperator: null,
     values: [{ id: 'urgent', name: 'Urgent' }],
   }];
+  resetBulkActions();
   store.dispatch('conversationPage/reset');
   store.dispatch('emptyAllConversations');
   store.dispatch('setConversationFilters', urgentPayload);
-  fetchFilteredConversations(urgentPayload);
+  onApplyFilter(urgentPayload);
 }
 function fetchConversations() {
   store.dispatch('updateChatListFilters', conversationFilters.value);

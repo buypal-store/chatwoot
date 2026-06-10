@@ -16,6 +16,7 @@ import { useInbox } from 'dashboard/composables/useInbox';
 import { useAlert } from 'dashboard/composables';
 import { useI18n } from 'vue-i18n';
 import { copyTextToClipboard } from 'shared/helpers/clipboard';
+import CardLabels from '../conversation/conversationCardComponents/CardLabels.vue';
 
 const props = defineProps({
   chat: {
@@ -96,6 +97,12 @@ const hasMultipleInboxes = computed(
 const hasSlaPolicyId = computed(
   () => props.chat?.applied_sla?.id && !currentContact.value?.blocked
 );
+
+const allLabels = computed(() => store.getters['labels/getLabels']);
+const getLabelColor = (title) => {
+  const label = allLabels.value.find(l => l.title === title);
+  return label?.color || '#888';
+};
 
 const copyConversationId = async () => {
   try {

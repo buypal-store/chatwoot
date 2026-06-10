@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch, inject } from 'vue';
+import { computed, ref, watch, inject, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useStore, useMapGetter } from 'dashboard/composables/store';
 import { frontendURL, conversationUrl } from 'dashboard/helper/URLHelper';
@@ -55,7 +55,10 @@ const contextMenu = ref({ x: null, y: null });
 const showPeek = ref(false);
 const peekMessages = ref([]);
 const peekLoading = ref(false);
+const peekLoadingMore = ref(false);
 const peekError = ref('');
+const peekBeforeId = ref(null);
+const peekHasMore = ref(false);
 
 watch(
   () => props.source.id,
@@ -70,8 +73,6 @@ const currentChat = useMapGetter('getSelectedChat');
 const inboxesList = useMapGetter('inboxes/getInboxes');
 const activeInbox = useMapGetter('getSelectedInbox');
 const accountId = useMapGetter('getCurrentAccountId');
-
-// Token del usuario logueado — mismo patrón que useFileUpload.js
 const currentUser = useMapGetter('getCurrentUser');
 
 const chatMetadata = computed(() => props.source.meta || {});
@@ -163,9 +164,18 @@ const onMarkAsRead = () => { markAsRead(props.source.id); closeContextMenu(); };
 const onAssignPriority = priority => { assignPriority(priority, props.source.id); closeContextMenu(); };
 const onDeleteConversation = () => { deleteConversation(props.source.id); closeContextMenu(); };
 
-// ─── PEEK: ver mensajes SIN triggerear update_last_seen ────────────────────
-// GET /messages no llama update_last_seen → no dispatcha CONVERSATION_READ
-// → webhook_listener#conversation_read no se ejecuta → prioridad intacta
+// ─── PEEK ────────────────────────────────────────────────────────────────────
+const fetchPeekMessages = async (beforeId = null) => {
+  const token = currentUser.value?.access_token;
+  const url = beforeId
+    ? `/api/v1/accounts/${accountId.value}/conversations/${props.source.id}/messages?before=${beforeId}`
+    : `/api/v1/accounts/${accountId.value}/conversations/${props.source.id}/messages`;
+  const res = await fetch(url, { headers: { 'api_access_token': token } });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  return data.payload || [];
+};
+
 const openPeek = async e => {
   e.stopPropagation();
   e.preventDefault();
@@ -173,21 +183,43 @@ const openPeek = async e => {
   peekMessages.value = [];
   peekError.value = '';
   peekLoading.value = true;
+  peekHasMore.value = false;
+  peekBeforeId.value = null;
 
   try {
-    const token = currentUser.value?.access_token;
-    const res = await fetch(
-      `/api/v1/accounts/${accountId.value}/conversations/${props.source.id}/messages`,
-      { headers: { 'api_access_token': token } }
-    );
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    peekMessages.value = (data.payload || [])
-      .slice(-50);                        // últimos 50
+    const msgs = await fetchPeekMessages();
+    peekMessages.value = msgs;
+    peekBeforeId.value = msgs[0]?.id || null;
+    peekHasMore.value = msgs.length >= 20;
+
+    await nextTick();
+    const body = document.querySelector('.peek-body');
+    if (body) body.scrollTop = body.scrollHeight;
   } catch (err) {
     peekError.value = err.message;
   } finally {
     peekLoading.value = false;
+  }
+};
+
+const loadMorePeek = async () => {
+  if (!peekBeforeId.value || peekLoadingMore.value) return;
+  peekLoadingMore.value = true;
+  try {
+    const body = document.querySelector('.peek-body');
+    const prevHeight = body?.scrollHeight || 0;
+
+    const msgs = await fetchPeekMessages(peekBeforeId.value);
+    peekMessages.value = [...msgs, ...peekMessages.value];
+    peekBeforeId.value = msgs[0]?.id || null;
+    peekHasMore.value = msgs.length >= 20;
+
+    await nextTick();
+    if (body) body.scrollTop = body.scrollHeight - prevHeight;
+  } catch (err) {
+    peekError.value = err.message;
+  } finally {
+    peekLoadingMore.value = false;
   }
 };
 
@@ -238,7 +270,7 @@ const formatTime = ts => {
       @de-select-conversation="deSelectConversation"
     />
 
-    <!-- Botón peek: aparece solo en hover, no abre la conversación -->
+    <!-- Botón peek -->
     <button
       v-if="source.priority === 'urgent'"
       class="peek-trigger"
@@ -248,7 +280,7 @@ const formatTime = ts => {
       👁
     </button>
 
-    <!-- Modal peek via Teleport para evitar problemas de z-index -->
+    <!-- Modal peek -->
     <Teleport to="body">
       <div v-if="showPeek" class="peek-backdrop" @click.self="closePeek">
         <div class="peek-modal">
@@ -269,8 +301,15 @@ const formatTime = ts => {
               Error: {{ peekError }}
             </div>
             <template v-else-if="peekMessages.length">
+              <!-- Botón cargar más -->
+              <div v-if="peekHasMore" class="peek-load-more">
+                <button class="peek-load-more-btn" :disabled="peekLoadingMore" @click="loadMorePeek">
+                  {{ peekLoadingMore ? 'Cargando...' : '↑ Cargar más' }}
+                </button>
+              </div>
+
               <div
-                v-for="msg in peekMessages"
+                v-for="msg in peekMessages.filter(m => m.message_type !== 2)"
                 :key="msg.id"
                 :class="[
                   'peek-msg',
@@ -282,21 +321,21 @@ const formatTime = ts => {
                   <span>{{ formatTime(msg.created_at) }}</span>
                 </div>
                 <div class="peek-msg-body">
-  {{ msg.content || '' }}
-  <template v-if="msg.attachments && msg.attachments.length">
-    <img
-      v-for="att in msg.attachments.filter(a => a.file_type === 'image')"
-      :key="att.id"
-      :src="att.thumb_url"
-      style="max-width:180px;max-height:140px;border-radius:6px;display:block;margin-top:4px;"
-    />
-    <div
-      v-for="att in msg.attachments.filter(a => a.file_type !== 'image')"
-      :key="att.id"
-      style="font-size:11px;opacity:0.6;"
-    >📎 {{ att.file_type }}</div>
-  </template>
-</div>
+                  {{ msg.content || '' }}
+                  <template v-if="msg.attachments && msg.attachments.length">
+                    <img
+                      v-for="att in msg.attachments.filter(a => a.file_type === 'image')"
+                      :key="att.id"
+                      :src="att.thumb_url"
+                      style="max-width:180px;max-height:140px;border-radius:6px;display:block;margin-top:4px;"
+                    />
+                    <div
+                      v-for="att in msg.attachments.filter(a => a.file_type !== 'image')"
+                      :key="att.id"
+                      style="font-size:11px;opacity:0.6;"
+                    >📎 {{ att.file_type }}</div>
+                  </template>
+                </div>
               </div>
             </template>
             <div v-else class="peek-empty">Sin mensajes</div>
@@ -311,7 +350,7 @@ const formatTime = ts => {
     </Teleport>
   </div>
 
-  <!-- Context menu compartido -->
+  <!-- Context menu -->
   <ContextMenu
     v-if="showContextMenu"
     :x="contextMenu.x"
@@ -367,7 +406,6 @@ const formatTime = ts => {
   z-index: 5;
   line-height: 1;
 }
-
 
 .peek-trigger:hover {
   background: rgba(147, 153, 176, 0.35);
@@ -440,6 +478,32 @@ const formatTime = ts => {
 .peek-close:hover {
   background: rgba(147, 153, 176, 0.15);
   color: rgb(237, 238, 240);
+}
+
+.peek-load-more {
+  text-align: center;
+  padding: 4px 0 8px;
+}
+
+.peek-load-more-btn {
+  background: rgba(147, 153, 176, 0.12);
+  border: none;
+  color: rgba(237, 238, 240, 0.5);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  transition: background 0.1s, color 0.1s;
+}
+
+.peek-load-more-btn:hover:not(:disabled) {
+  background: rgba(147, 153, 176, 0.22);
+  color: rgb(237, 238, 240);
+}
+
+.peek-load-more-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .peek-body {

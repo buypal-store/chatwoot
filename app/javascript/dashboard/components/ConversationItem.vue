@@ -241,7 +241,7 @@ const formatTime = ts => {
 
     <!-- Botón peek: aparece solo en hover, no abre la conversación -->
     <button
-      v-if="source.unread_count > 0"
+      v-if="source.priority === 'urgent'"
       class="peek-trigger"
       title="Vista rápida — no marca como leído"
       @click="openPeek"
@@ -335,29 +335,27 @@ const formatTime = ts => {
 
 .peek-trigger {
   position: absolute;
-  top: 50%;
-  right: 10px;
-  transform: translateY(-50%);
-  width: 26px;
-  height: 26px;
+  top: auto;
+  bottom: 14px;
+  right: 28px;
+  transform: none;
+  width: 30px;
+  height: 30px;
   border-radius: 6px;
   border: none;
   background: rgba(147, 153, 176, 0.2);
   color: rgb(237, 238, 240);
-  font-size: 13px;
+  font-size: 17px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: 0;
-  transition: opacity 0.15s ease, background 0.15s ease;
+  opacity: 1;
+  transition: background 0.15s ease;
   z-index: 5;
   line-height: 1;
 }
 
-.conv-item-wrap:hover .peek-trigger {
-  opacity: 1;
-}
 
 .peek-trigger:hover {
   background: rgba(147, 153, 176, 0.35);

@@ -183,8 +183,7 @@ const openPeek = async e => {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     peekMessages.value = (data.payload || [])
-      .filter(m => m.message_type !== 2) // excluye mensajes de actividad
-      .slice(-25);                        // últimos 25
+      .slice(-50);                        // últimos 50
   } catch (err) {
     peekError.value = err.message;
   } finally {
@@ -283,8 +282,21 @@ const formatTime = ts => {
                   <span>{{ formatTime(msg.created_at) }}</span>
                 </div>
                 <div class="peek-msg-body">
-                  {{ msg.content || '[adjunto]' }}
-                </div>
+  {{ msg.content || '' }}
+  <template v-if="msg.attachments && msg.attachments.length">
+    <img
+      v-for="att in msg.attachments.filter(a => a.file_type === 'image')"
+      :key="att.id"
+      :src="att.thumb_url"
+      style="max-width:180px;max-height:140px;border-radius:6px;display:block;margin-top:4px;"
+    />
+    <div
+      v-for="att in msg.attachments.filter(a => a.file_type !== 'image')"
+      :key="att.id"
+      style="font-size:11px;opacity:0.6;"
+    >📎 {{ att.file_type }}</div>
+  </template>
+</div>
               </div>
             </template>
             <div v-else class="peek-empty">Sin mensajes</div>

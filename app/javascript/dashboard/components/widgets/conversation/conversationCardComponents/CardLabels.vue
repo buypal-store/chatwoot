@@ -18,7 +18,7 @@ const activeLabels = computed(() => {
   );
 });
 
-const showAllLabels = ref(false);
+const showAllLabels = ref(true);
 const showExpandLabelButton = ref(false);
 const labelPosition = ref(-1);
 const labelContainer = ref(null);
@@ -80,7 +80,7 @@ const onShowLabels = e => {
         }"
       />
       <button
-        v-if="showExpandLabelButton"
+          v-if="false"
         :title="
           showAllLabels
             ? $t('CONVERSATION.CARD.HIDE_LABELS')

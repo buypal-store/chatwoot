@@ -193,8 +193,10 @@ const openPeek = async e => {
     peekHasMore.value = msgs.length >= 20;
 
     await nextTick();
-    const body = document.querySelector('.peek-body');
-    if (body) body.scrollTop = body.scrollHeight;
+    setTimeout(() => {
+      const body = document.querySelector('.peek-body');
+      if (body) body.scrollTop = body.scrollHeight;
+}, 100);
   } catch (err) {
     peekError.value = err.message;
   } finally {

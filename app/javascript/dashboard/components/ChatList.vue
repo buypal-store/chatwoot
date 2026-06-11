@@ -563,7 +563,7 @@ function onUrgentFilter() {
   customAttributeType: '',
   filterOperator: 'equal_to',
   queryOperator: null,
-  values: [currentUserId],
+  values: [{ id: currentUserId, name: '' }],
 },
   ];
   resetBulkActions();

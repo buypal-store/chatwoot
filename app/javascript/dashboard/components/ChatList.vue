@@ -547,15 +547,27 @@ function onToggleAdvanceFiltersModal() {
   showAdvancedFilters.value = true;
 }
 function onUrgentFilter() {
-  const urgentPayload = [{
-    attributeKey: 'priority',
-    attributeModel: 'standard',
-    customAttributeType: '',
-    filterOperator: 'equal_to',
-    queryOperator: null,
-    values: [{ id: 'urgent', name: 'Urgent' }],
-  }];
+  const currentUserId = store.getters['getCurrentUser']?.id;
+  const urgentPayload = [
+    {
+      attributeKey: 'priority',
+      attributeModel: 'standard',
+      customAttributeType: '',
+      filterOperator: 'equal_to',
+      queryOperator: 'and',
+      values: [{ id: 'urgent', name: 'Urgent' }],
+    },
+    {
+  attributeKey: 'assigneeId',
+  attributeModel: 'standard',
+  customAttributeType: '',
+  filterOperator: 'equal_to',
+  queryOperator: null,
+  values: [currentUserId],
+},
+  ];
   resetBulkActions();
+  appliedFilter.value = urgentPayload;
   store.dispatch('conversationPage/reset');
   store.dispatch('emptyAllConversations');
   store.dispatch('setConversationFilters', urgentPayload);

@@ -23,7 +23,7 @@ const store = useStore();
   
 // Colores por equipo
 const TEAM_COLORS = {
-  1: '#EF4444', // sento home — rojo
+  1: '#EAB308', // sento home — amarillo
   2: '#3B82F6', // buypal — azul
   3: '#EC4899', // babypal — rosa
 };
@@ -236,7 +236,7 @@ const formatTime = ts => {
 </script>
 
 <template>
-  <div class="conv-item-wrap" :style="teamColor ? { borderLeft: `3px solid ${teamColor}` } : {}">
+  <div class="conv-item-wrap" :style="teamColor ? { borderLeft: `4px solid ${teamColor}` } : {}">
     <!-- Expanded layout -->
     <ConversationCardExpanded
       v-if="showExpanded"

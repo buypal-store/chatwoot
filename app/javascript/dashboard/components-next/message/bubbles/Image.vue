@@ -66,6 +66,7 @@ const handleImageError = () => {
         :src="attachment.dataUrl"
         :width="attachment.width"
         :height="attachment.height"
+        style="max-width:240px;max-height:280px;border-radius:6px;"
       />
       <div
         class="inset-0 p-2 pointer-events-none absolute bg-gradient-to-tl from-n-slate-12/30 dark:from-n-slate-1/50 via-transparent to-transparent hidden group-hover:flex"

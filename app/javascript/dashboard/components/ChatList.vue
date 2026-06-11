@@ -548,30 +548,39 @@ function onToggleAdvanceFiltersModal() {
 }
 function onUrgentFilter() {
   const currentUserId = store.getters['getCurrentUser']?.id;
+  const isAllTab = activeAssigneeTab.value === 'all';
+
   const urgentPayload = [
     {
-      attributeKey: 'priority',
-      attributeModel: 'standard',
-      customAttributeType: '',
-      filterOperator: 'equal_to',
-      queryOperator: 'and',
+      attribute_key: 'priority',
+      attribute_model: 'standard',
+      custom_attribute_type: '',
+      filter_operator: 'equal_to',
+      query_operator: isAllTab ? null : 'and',
       values: [{ id: 'urgent', name: 'Urgent' }],
     },
-    {
-  attributeKey: 'assigneeId',
-  attributeModel: 'standard',
-  customAttributeType: '',
-  filterOperator: 'equal_to',
-  queryOperator: null,
-  values: [{ id: currentUserId, name: '' }],
-},
   ];
+
+  if (!isAllTab) {
+    urgentPayload.push({
+      attribute_key: 'assignee_id',
+      attribute_model: 'standard',
+      custom_attribute_type: '',
+      filter_operator: 'equal_to',
+      query_operator: null,
+      values: [{ id: currentUserId, name: '' }],
+    });
+  }
+
   resetBulkActions();
   appliedFilter.value = urgentPayload;
   store.dispatch('conversationPage/reset');
   store.dispatch('emptyAllConversations');
   store.dispatch('setConversationFilters', urgentPayload);
-  onApplyFilter(urgentPayload);
+  store.dispatch('fetchFilteredConversations', {
+  queryData: filterQueryGenerator(urgentPayload),
+  page: 1,
+}).then(emitConversationLoaded);
 }
 function fetchConversations() {
   store.dispatch('updateChatListFilters', conversationFilters.value);

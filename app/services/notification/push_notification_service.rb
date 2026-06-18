@@ -1,6 +1,5 @@
 class Notification::PushNotificationService
   include Rails.application.routes.url_helpers
-
   pattr_initialize [:notification!]
 
   def perform
@@ -30,12 +29,45 @@ class Notification::PushNotificationService
     @conversation ||= notification.conversation
   end
 
+  # ───── CAMBIO: notificación estilo bandeja ─────
   def push_message
     {
-      title: notification.push_message_title,
+      title: push_title,
+      body: push_body,
       tag: "#{notification.notification_type}_#{conversation.display_id}_#{notification.id}",
+      icon: brand_icon,
+      badge: brand_icon,
       url: push_url
     }
+  end
+
+  def push_title
+    "Mensaje a tu Bandeja #" + conversation.display_id.to_s
+  end
+
+  def relevant_message
+    @relevant_message ||= conversation.messages.incoming.last ||
+                          conversation.messages.where.not(content: [nil, '']).last
+  end
+
+  def push_body
+    return notification.push_message_body if relevant_message.nil?
+
+    content = relevant_message.content.to_s.strip
+    content = '📎 Adjunto' if content.blank?
+    content = "#{content[0...120]}…" if content.length > 120
+    "#{content} - #{message_time}"
+  end
+
+  def message_time
+    return '' if relevant_message.nil?
+
+    tz = notification.account.reporting_timezone.presence || 'America/Lima'
+    relevant_message.created_at.in_time_zone(tz).strftime('%H:%M')
+  end
+
+  def brand_icon
+    "#{ENV.fetch('FRONTEND_URL', '')}/notification-icon.png"
   end
 
   def push_url
@@ -148,8 +180,8 @@ class Notification::PushNotificationService
 
   def fcm_notification
     {
-      title: notification.push_message_title,
-      body: notification.push_message_body
+      title: push_title,
+      body: push_body
     }
   end
 

@@ -14,20 +14,15 @@ self.addEventListener('push', event => {
     })
   );
 });
-
 self.addEventListener('notificationclick', event => {
   let notification = event.notification;
-
+  notification.close();
   event.waitUntil(
-    clients.matchAll({ type: 'window' }).then(windowClients => {
-      let matchingWindowClients = windowClients.filter(
-        client => client.url === notification.data.url
-      );
-
-      if (matchingWindowClients.length) {
-        let firstWindow = matchingWindowClients[0];
-        if (firstWindow && 'focus' in firstWindow) {
-          firstWindow.focus();
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+      for (const client of windowClients) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          client.focus();
+          if ('navigate' in client) client.navigate(notification.data.url);
           return;
         }
       }

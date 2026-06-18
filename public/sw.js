@@ -2,10 +2,12 @@
 /* globals clients */
 self.addEventListener('push', event => {
   let notification = event.data && event.data.json();
-
   event.waitUntil(
     self.registration.showNotification(notification.title, {
+      body: notification.body,
       tag: notification.tag,
+      icon: notification.icon,
+      badge: notification.badge,
       data: {
         url: notification.url,
       },

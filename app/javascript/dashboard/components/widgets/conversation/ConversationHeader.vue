@@ -28,7 +28,7 @@ const props = defineProps({
     default: false,
   },
 });
-
+defineEmits(['toggle-pedido-panel']);
 const { t } = useI18n();
 const store = useStore();
 const route = useRoute();
@@ -157,7 +157,7 @@ const copyConversationId = async () => {
         >
           <button
             type="button"
-            class="truncate text-label-small text-n-slate-11 hover:text-n-slate-12 !p-0 cucursor-pointer"
+            class="truncate text-label-small text-n-slate-11 hover:text-n-slate-12 !p-0 cursor-pointer"
             @click="copyConversationId"
           >
             {{ `#${chat.id}` }}
@@ -192,6 +192,12 @@ const copyConversationId = async () => {
         class="hidden md:flex"
       />
       <ConversationCallButton :inbox="inbox" :chat="currentChat" />
+	<button
+        class="inline-flex items-center min-w-0 gap-2 transition-all duration-100 ease-out border-0 rounded-lg outline-1 outline disabled:opacity-50 bg-n-button-color dark:hover:enabled:bg-n-solid-2 dark:focus-visible:bg-n-solid-2 hover:enabled:bg-n-alpha-2 focus-visible:bg-n-alpha-2 text-n-slate-12 outline-n-container h-8 px-3 text-sm justify-center"
+        @click="$emit('toggle-pedido-panel', chat.id)"
+      >
+        Tomar Pedido
+      </button>
       <MoreActions :conversation-id="currentChat.id" />
     </div>
   </div>

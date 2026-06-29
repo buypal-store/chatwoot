@@ -17,7 +17,7 @@ import { useAlert } from 'dashboard/composables';
 import { useI18n } from 'vue-i18n';
 import { copyTextToClipboard } from 'shared/helpers/clipboard';
 import CardLabels from '../conversation/conversationCardComponents/CardLabels.vue';
-  
+
 const props = defineProps({
   chat: {
     type: Object,
@@ -28,7 +28,7 @@ const props = defineProps({
     default: false,
   },
 });
-
+defineEmits(['toggle-pedido-panel']);
 const { t } = useI18n();
 const store = useStore();
 const route = useRoute();
@@ -176,17 +176,26 @@ const copyConversationId = async () => {
       </div>
     </div>
     <div
-      class="flex flex-row items-center justify-start xl:justify-end flex-shrink-0 gap-2 w-full xl:w-auto header-actions-wrap"
-    >
-      <SLACardLabel
-        v-if="hasSlaPolicyId"
-        :chat="chat"
-        show-extended-info
-        :parent-width="width"
-        class="hidden md:flex"
-      />
-      <ConversationCallButton :inbox="inbox" :chat="currentChat" />
-      <MoreActions :conversation-id="currentChat.id" />
-    </div>
+  class="flex flex-row items-center justify-start xl:justify-end flex-shrink-0 gap-2 w-full xl:w-auto header-actions-wrap"
+>
+  <SLACardLabel
+    v-if="hasSlaPolicyId"
+    :chat="chat"
+    show-extended-info
+    :parent-width="width"
+    class="hidden md:flex"
+  />
+  <ConversationCallButton :inbox="inbox" :chat="currentChat" />
+
+  <!-- 🔘 Botón "Tomar Pedido" (emite el ID de la conversación) -->
+  <button
+    class="inline-flex items-center min-w-0 gap-2 transition-all duration-100 ease-out border-0 rounded-lg outline-1 outline disabled:opacity-50 bg-n-button-color dark:hover:enabled:bg-n-solid-2 dark:focus-visible:bg-n-solid-2 hover:enabled:bg-n-alpha-2 focus-visible:bg-n-alpha-2 text-n-slate-12 outline-n-container h-8 px-3 text-sm justify-center"
+    @click="$emit('toggle-pedido-panel', chat.id)"
+  >
+    Tomar Pedido
+  </button>
+
+  <MoreActions :conversation-id="currentChat.id" />
   </div>
+</div> <!-- 🔴 CIERRE del div principal (conversationHeader) -->
 </template>

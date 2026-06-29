@@ -93,6 +93,11 @@ export default {
       return conversationDisplayType !== CONDENSED;
     },
 
+    conversationViewStyle() {
+  return this.showPedidoPanel
+    ? { marginRight: '400px', transition: 'margin-right 0.3s ease' }
+    : { transition: 'margin-right 0.3s ease' };
+},
     shouldShowSidebar() {
       if (!this.currentChat.id) {
         return false;
@@ -209,7 +214,10 @@ export default {
 </script>
 
 <template>
-  <section class="flex w-full h-full min-w-0">
+  <section
+    class="flex w-full h-full min-w-0"
+    :style="conversationViewStyle"
+  >
     <ChatList
       :show-conversation-list="showConversationList"
       :conversation-inbox="inboxId"
@@ -227,15 +235,15 @@ export default {
     >
       <SidepanelSwitch v-if="currentChat.id" />
     </ConversationBox>
-    <div v-if="currentChat.id" class="relative" style="width: 320px; min-width: 320px;">
-  <ConversationSidebar v-if="shouldShowSidebar" :current-chat="currentChat" />
+    <ConversationSidebar v-if="shouldShowSidebar" :current-chat="currentChat" />
+    <CmdBarConversationSnooze />
+  </section>
+
+  <!-- Panel del catálogo (flotante, empuja el contenido) -->
   <PedidoPanel
     :visible="showPedidoPanel"
     :conversation-id="pedidoConversationId"
     :inbox-id="pedidoInboxId"
     @close="showPedidoPanel = false"
   />
-</div>
-    <CmdBarConversationSnooze />
-  </section>
 </template>

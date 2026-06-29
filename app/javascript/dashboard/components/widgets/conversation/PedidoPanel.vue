@@ -42,7 +42,12 @@ const props = defineProps({
 defineEmits(['close']);
 
 const CATALOG_MAP = {
+  // Inbox 15 → catálogo anterior (cámaras, si todavía lo usás)
   15: 'https://buypal-store.github.io/buypal_chatwoot/',
+  
+  // Inboxes 5 y 8 → nuevo catálogo de escaleras
+  5: 'https://buypal-store.github.io/sento_chatwoot/',
+  8: 'https://buypal-store.github.io/sento_chatwoot/',
 };
 
 const catalogUrl = computed(() => {

@@ -1,4 +1,5 @@
 <script>
+import PedidoPanel from 'dashboard/components/widgets/conversation/PedidoPanel.vue';
 import { mapGetters } from 'vuex';
 import { useUISettings } from 'dashboard/composables/useUISettings';
 import { useAccount } from 'dashboard/composables/useAccount';
@@ -13,12 +14,13 @@ import ConversationSidebar from 'dashboard/components/widgets/conversation/Conve
 
 export default {
   components: {
-    ChatList,
-    ConversationBox,
-    CmdBarConversationSnooze,
-    SidepanelSwitch,
-    ConversationSidebar,
-  },
+  ChatList,
+  ConversationBox,
+  CmdBarConversationSnooze,
+  SidepanelSwitch,
+  ConversationSidebar,
+  PedidoPanel,  // ←
+},
   beforeRouteLeave(to, from, next) {
     // Clear selected state if navigating away from a conversation to a route without a conversationId to prevent stale data issues
     // and resolves timing issues during navigation with conversation view and other screens
@@ -64,10 +66,13 @@ export default {
     };
   },
   data() {
-    return {
-      showSearchModal: false,
-    };
-  },
+  return {
+    showSearchModal: false,
+    showPedidoPanel: false,
+    pedidoConversationId: null,
+    pedidoInboxId: null,
+  };
+},
   computed: {
     ...mapGetters({
       chatList: 'getAllConversations',
@@ -114,16 +119,25 @@ export default {
   },
 
   mounted() {
-    this.$store.dispatch('agents/get');
-    this.$store.dispatch('portals/index');
-    this.initialize();
-    this.$watch('$store.state.route', () => this.initialize());
-    this.$watch('chatList.length', () => {
-      this.setActiveChat();
-    });
-  },
+  this.$store.dispatch('agents/get');
+  this.$store.dispatch('portals/index');
+  this.initialize();
+  this.$watch('$store.state.route', () => this.initialize());
+  this.$watch('chatList.length', () => {
+    this.setActiveChat();
+  });
+  emitter.on('toggle-pedido-panel', this.handlePedidoPanel); // ← agregar
+},
+  beforeDestroy() {
+  emitter.off('toggle-pedido-panel', this.handlePedidoPanel);
+},
 
   methods: {
+    handlePedidoPanel({ conversationId, inboxId }) {
+     this.pedidoConversationId = conversationId;
+     this.pedidoInboxId = inboxId;
+     this.showPedidoPanel = !this.showPedidoPanel;
+    },
     onConversationLoad() {
       this.fetchConversationIfUnavailable();
     },
@@ -213,7 +227,15 @@ export default {
     >
       <SidepanelSwitch v-if="currentChat.id" />
     </ConversationBox>
-    <ConversationSidebar v-if="shouldShowSidebar" :current-chat="currentChat" />
+    <div v-if="currentChat.id" class="relative" style="width: 320px; min-width: 320px;">
+  <ConversationSidebar v-if="shouldShowSidebar" :current-chat="currentChat" />
+  <PedidoPanel
+    :visible="showPedidoPanel"
+    :conversation-id="pedidoConversationId"
+    :inbox-id="pedidoInboxId"
+    @close="showPedidoPanel = false"
+  />
+</div>
     <CmdBarConversationSnooze />
   </section>
 </template>

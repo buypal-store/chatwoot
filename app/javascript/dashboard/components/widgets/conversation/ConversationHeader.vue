@@ -1,4 +1,5 @@
 <script setup>
+import { emitter } from 'shared/helpers/mitt';
 import { computed, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { useStore } from 'vuex';
@@ -188,12 +189,12 @@ const copyConversationId = async () => {
   <ConversationCallButton :inbox="inbox" :chat="currentChat" />
 
   <!-- 🔘 Botón "Tomar Pedido" (emite el ID de la conversación) -->
-  <button
-    class="inline-flex items-center min-w-0 gap-2 transition-all duration-100 ease-out border-0 rounded-lg outline-1 outline disabled:opacity-50 bg-n-button-color dark:hover:enabled:bg-n-solid-2 dark:focus-visible:bg-n-solid-2 hover:enabled:bg-n-alpha-2 focus-visible:bg-n-alpha-2 text-n-slate-12 outline-n-container h-8 px-3 text-sm justify-center"
-    @click="$emit('toggle-pedido-panel', chat.id, inbox.id)"
-  >
-    Tomar Pedido
-  </button>
+ <button
+  class="inline-flex items-center min-w-0 gap-2 transition-all duration-100 ease-out border-0 rounded-lg outline-1 outline disabled:opacity-50 bg-n-button-color dark:hover:enabled:bg-n-solid-2 dark:focus-visible:bg-n-solid-2 hover:enabled:bg-n-alpha-2 focus-visible:bg-n-alpha-2 text-n-slate-12 outline-n-container h-8 px-3 text-sm justify-center"
+  @click="emitter.emit('toggle-pedido-panel', { conversationId: chat.id, inboxId: inbox.id })"
+>
+  Tomar Pedido
+</button>
 
   <MoreActions :conversation-id="currentChat.id" />
   </div>

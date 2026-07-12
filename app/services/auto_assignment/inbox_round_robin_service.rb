@@ -32,33 +32,69 @@ class AutoAssignment::InboxRoundRobinService
 
   private
 
-  # === FILA INDIA ESTRICTA ===========================================
-  # Orden circular FIJO de los miembros del inbox + puntero del ultimo
-  # asignado. Aqui solo decidimos el TURNO: avanzamos desde el ultimo y
-  # tomamos al primer agente disponible, saltando a los desconectados.
+  # === FILA INDIA ESTRICTA, GLOBAL POR CUENTA ========================
+  # El orden circular es el de TODOS los agentes de la CUENTA, no los del
+  # inbox. El puntero tambien es por cuenta, asi que siempre encuentra su
+  # indice y la fila AVANZA entre canales en lugar de reiniciarse en 0.
   def get_member_from_allowed_agent_ids(allowed_agent_ids)
     return nil if allowed_agent_ids.blank?
 
-    allowed = allowed_agent_ids.map(&:to_s)
-    ordered = stable_member_order                      # orden determinista
-    last    = ::Redis::Alfred.get(strict_pointer_key)  # a quien le toco la ultima vez
-    idx     = last ? ordered.index(last.to_s) : nil
-    start   = idx ? idx + 1 : 0
+    allowed = Array(allowed_agent_ids).map(&:to_s)
+    ordered = stable_account_order
+    return nil if ordered.blank?
 
-    # recorre circularmente desde el siguiente y toma el primer ONLINE permitido
-    user_id = ordered.rotate(start).find { |uid| allowed.include?(uid) }
-    ::Redis::Alfred.set(strict_pointer_key, user_id) if user_id.present?
-    user_id
+    with_pointer_lock do
+      last  = ::Redis::Alfred.get(strict_pointer_key)
+      idx   = last ? ordered.index(last.to_s) : nil
+      start = idx ? idx + 1 : 0
+
+      # recorre circularmente desde el siguiente y toma el primer ONLINE permitido
+      user_id = ordered.rotate(start).find { |uid| allowed.include?(uid) }
+      ::Redis::Alfred.set(strict_pointer_key, user_id) if user_id.present?
+      user_id
+    end
   end
 
-  # Orden estable de TODOS los miembros del inbox (por user_id): el turno no
-  # cambia entre mensajes ni se rompe cuando alguien entra/sale del inbox.
-  def stable_member_order
-    inbox.inbox_members.order(:user_id).pluck(:user_id).map(&:to_s)
+  # Orden estable de TODOS los agentes de la CUENTA (miembros de cualquier
+  # inbox), ordenados por user_id. Cache de 60s para no golpear la DB en
+  # cada mensaje entrante.
+  def stable_account_order
+    Rails.cache.fetch("strict_rr_order/#{inbox.account_id}", expires_in: 60.seconds) do
+      InboxMember.joins(:inbox)
+                 .where(inboxes: { account_id: inbox.account_id })
+                 .distinct
+                 .order(:user_id)
+                 .pluck(:user_id)
+                 .map(&:to_s)
+    end
+  end
+
+  # Lock atomico: sin esto, dos jobs de Sidekiq simultaneos leen el mismo
+  # puntero y asignan la conversacion al MISMO agente.
+  def with_pointer_lock
+    token    = SecureRandom.uuid
+    acquired = false
+
+    20.times do
+      acquired = ::Redis::Alfred.with_redis { |r| r.set(lock_key, token, nx: true, ex: 5) }
+      break if acquired
+
+      sleep 0.05
+    end
+
+    yield
+  ensure
+    ::Redis::Alfred.with_redis do |r|
+      r.del(lock_key) if r.get(lock_key) == token
+    end
+  end
+
+  def lock_key
+    "STRICT_RR_LOCK::ACCOUNT::#{inbox.account_id}"
   end
 
   def strict_pointer_key
-  "STRICT_RR_POINTER::ACCOUNT::#{inbox.account_id}"
+    "STRICT_RR_POINTER::ACCOUNT::#{inbox.account_id}"
   end
 
   # ---- se conservan por compatibilidad con los listeners de cola ----

@@ -1,12 +1,7 @@
 class AutoAssignment::InboxRoundRobinService
   pattr_initialize [:inbox!]
 
-  LOCK_TTL     = 5     # segundos que vive el lock en Redis
-  LOCK_SAFETY  = 1     # margen: si tardé más de (TTL - SAFETY), no borro
-  LOCK_RETRIES = 20
-  LOCK_BACKOFF = 0.05  # 20 * 0.05 = hasta 1s esperando el turno
-
-  # ---- gestión de cola (listeners de Chatwoot) ----
+  # ---- gestión de cola (listeners nativos de Chatwoot) ----
   def clear_queue
     ::Redis::Alfred.delete(round_robin_key)
   end
@@ -36,37 +31,36 @@ class AutoAssignment::InboxRoundRobinService
     $alfred
   end
 
-  # === FILA INDIA ESTRICTA, GLOBAL POR CUENTA ===
+  # === FILA INDIA ESTRICTA, GLOBAL POR CUENTA, SIN LOCK ===
+  #
+  # INCR es atomico en Redis: dos jobs concurrentes NUNCA reciben el mismo
+  # cursor. Eso elimina la doble asignacion sin necesidad de locks, sleeps
+  # ni scripts Lua. El cursor solo sube; el modulo lo mapea a la posicion.
   def next_user_id(allowed_agent_ids)
     return nil if allowed_agent_ids.blank?
 
     allowed = Array(allowed_agent_ids).map(&:to_s)
     ordered = stable_account_order
+    ordered = allowed if ordered.blank? # fallback si la DB/cache falla
     return nil if ordered.blank?
 
-    with_pointer_lock do
-      start   = next_start_index(ordered)
-      user_id = ordered.rotate(start).find { |uid| allowed.include?(uid) }
+    cursor = redis.incr(cursor_key)
+    redis.expire(cursor_key, 30.days.to_i)
 
-      if user_id.present?
-        redis.set(strict_pointer_key, user_id)
-        redis.set(strict_pointer_idx_key, ordered.index(user_id))
-      end
+    start = cursor % ordered.size
 
-      user_id
-    end
+    # Recorre circularmente desde la posicion del turno y toma el primer
+    # agente que este ONLINE y permitido. Si nadie del orden global esta
+    # disponible, cae al primero permitido (nunca devuelve nil por error).
+    ordered.rotate(start).find { |uid| allowed.include?(uid) } || allowed.first
+  rescue StandardError => e
+    # NUNCA romper la asignacion en produccion por un fallo de Redis/DB.
+    Rails.logger.error("[StrictRR] fallback: #{e.class} #{e.message}")
+    Array(allowed_agent_ids).map(&:to_s).sample
   end
 
-  # Si al último asignado lo sacaron del equipo, NO reiniciamos en 0
-  # (eso haría que el primer agente acapare todo). Retomamos por índice.
-  def next_start_index(ordered)
-    last = redis.get(strict_pointer_key)
-    idx  = last ? ordered.index(last.to_s) : nil
-    return idx + 1 if idx
-
-    redis.get(strict_pointer_idx_key).to_i.clamp(0, ordered.size - 1)
-  end
-
+  # Orden estable de TODOS los agentes de la CUENTA, por user_id.
+  # Cache corto para no golpear la DB en cada mensaje entrante.
   def stable_account_order
     Rails.cache.fetch("strict_rr_order/#{inbox.account_id}", expires_in: 30.seconds) do
       InboxMember.joins(:inbox)
@@ -78,55 +72,11 @@ class AutoAssignment::InboxRoundRobinService
     end
   end
 
-  # Lock atómico SIN Lua.
-  # - Adquirir: SET NX EX  -> atómico de verdad, y respeta el namespace.
-  # - Liberar : DEL simple, pero SOLO si tardé menos que el TTL. Si tardé más,
-  #             el lock ya pudo expirar y ser de otro worker: no lo toco y
-  #             dejo que Redis lo limpie solo. Nunca borro un lock ajeno.
-  def with_pointer_lock
-    token       = SecureRandom.uuid
-    acquired    = false
-    acquired_at = nil
-
-    LOCK_RETRIES.times do
-      if redis.set(lock_key, token, nx: true, ex: LOCK_TTL)
-        acquired    = true
-        acquired_at = monotonic_now
-        break
-      end
-      sleep LOCK_BACKOFF
-    end
-
-    unless acquired
-      Rails.logger.warn("[StrictRR] lock no adquirido (account #{inbox.account_id})")
-      return nil # abortamos: mejor no asignar que asignar doble
-    end
-
-    yield
-  ensure
-    if acquired && (monotonic_now - acquired_at) < (LOCK_TTL - LOCK_SAFETY)
-      redis.del(lock_key)
-    end
+  def cursor_key
+    "STRICT_RR_CURSOR::ACCOUNT::#{inbox.account_id}"
   end
 
-  # Reloj monotónico: inmune a ajustes de NTP / cambios de hora del sistema.
-  def monotonic_now
-    Process.clock_gettime(Process::CLOCK_MONOTONIC)
-  end
-
-  def lock_key
-    "STRICT_RR_LOCK::ACCOUNT::#{inbox.account_id}"
-  end
-
-  def strict_pointer_key
-    "STRICT_RR_POINTER::ACCOUNT::#{inbox.account_id}"
-  end
-
-  def strict_pointer_idx_key
-    "STRICT_RR_POINTER_IDX::ACCOUNT::#{inbox.account_id}"
-  end
-
-  # ---- compatibilidad ----
+  # ---- compatibilidad con los listeners de cola ----
   def pop_push_to_queue(user_id)
     return if user_id.blank?
 

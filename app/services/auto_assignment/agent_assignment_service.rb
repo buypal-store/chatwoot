@@ -15,8 +15,8 @@ class AutoAssignment::AgentAssignmentService
 
   private
 
-  def redis
-    $alfred
+  def with_redis(&block)
+    $alfred.with(&block)
   end
 
   def presence_statuses
@@ -32,17 +32,19 @@ class AutoAssignment::AgentAssignmentService
   def recently_seen_agent_ids
     now = Time.now.to_i
 
-    live_agent_ids.each { |uid| redis.hset(last_seen_key, uid, now) }
-    redis.expire(last_seen_key, 1.day.to_i)
+    with_redis do |r|
+      live_agent_ids.each { |uid| r.hset(last_seen_key, uid, now) }
+      r.expire(last_seen_key, 1.day.to_i)
 
-    cutoff = now - PRESENCE_GRACE.to_i
-    redis.hgetall(last_seen_key).select { |_uid, ts| ts.to_i >= cutoff }.keys
-  rescue StandardError
+      cutoff = now - PRESENCE_GRACE.to_i
+      r.hgetall(last_seen_key).select { |_uid, ts| ts.to_i >= cutoff }.keys
+    end
+  rescue StandardError => e
+    Rails.logger.error("[StrictRR] last_seen fallo: #{e.class} #{e.message}")
     []
   end
 
   # La disponibilidad DECLARADA vive en account_users, no en users.
-  # Blindado: si la columna no existe en esta version, no rompe nada.
   def explicitly_offline_ids
     candidate_ids = (live_agent_ids | recently_seen_agent_ids).map(&:to_i)
     return [] if candidate_ids.blank?

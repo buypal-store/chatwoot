@@ -1,17 +1,27 @@
 class AutoAssignment::InboxRoundRobinService
   pattr_initialize [:inbox!]
 
-  # called on inbox delete
+  LOCK_TTL      = 5      # segundos
+  LOCK_RETRIES  = 20
+  LOCK_BACKOFF  = 0.05
+
+  # Libera el lock solo si sigue siendo nuestro. Atómico.
+  UNLOCK_SCRIPT = <<~LUA.freeze
+    if redis.call("get", KEYS[1]) == ARGV[1] then
+      return redis.call("del", KEYS[1])
+    else
+      return 0
+    end
+  LUA
+
   def clear_queue
     ::Redis::Alfred.delete(round_robin_key)
   end
 
-  # called on inbox member create
   def add_agent_to_queue(user_id)
     ::Redis::Alfred.lpush(round_robin_key, user_id)
   end
 
-  # called on inbox member delete
   def remove_agent_from_queue(user_id)
     ::Redis::Alfred.lrem(round_robin_key, user_id)
   end
@@ -21,22 +31,20 @@ class AutoAssignment::InboxRoundRobinService
     add_agent_to_queue(inbox.inbox_members.map(&:user_id))
   end
 
-  # end of queue management functions
-
-  # allowed_agent_ids = agentes ONLINE y permitidos, ya filtrados por el caller
-  # (tanto el flujo legacy como el de Assignment Policies v2). Valores en string.
+  # allowed_agent_ids: agentes ONLINE y permitidos, ya filtrados por el caller.
   def available_agent(allowed_agent_ids: [])
-    user_id = get_member_from_allowed_agent_ids(allowed_agent_ids)
+    user_id = next_user_id(allowed_agent_ids)
     inbox.inbox_members.find_by(user_id: user_id)&.user if user_id.present?
   end
 
   private
 
-  # === FILA INDIA ESTRICTA, GLOBAL POR CUENTA ========================
-  # El orden circular es el de TODOS los agentes de la CUENTA, no los del
-  # inbox. El puntero tambien es por cuenta, asi que siempre encuentra su
-  # indice y la fila AVANZA entre canales en lugar de reiniciarse en 0.
-  def get_member_from_allowed_agent_ids(allowed_agent_ids)
+  def redis
+    $alfred # ConnectionPool::Wrapper con namespace. No hace falta parchear Alfred.
+  end
+
+  # === FILA INDIA ESTRICTA, GLOBAL POR CUENTA ===
+  def next_user_id(allowed_agent_ids)
     return nil if allowed_agent_ids.blank?
 
     allowed = Array(allowed_agent_ids).map(&:to_s)
@@ -44,22 +52,32 @@ class AutoAssignment::InboxRoundRobinService
     return nil if ordered.blank?
 
     with_pointer_lock do
-      last  = ::Redis::Alfred.get(strict_pointer_key)
-      idx   = last ? ordered.index(last.to_s) : nil
-      start = idx ? idx + 1 : 0
-
-      # recorre circularmente desde el siguiente y toma el primer ONLINE permitido
+      start   = next_start_index(ordered)
       user_id = ordered.rotate(start).find { |uid| allowed.include?(uid) }
-      ::Redis::Alfred.set(strict_pointer_key, user_id) if user_id.present?
+
+      if user_id.present?
+        redis.set(strict_pointer_key, user_id)
+        redis.set(strict_pointer_idx_key, ordered.index(user_id))
+      end
+
       user_id
     end
   end
 
-  # Orden estable de TODOS los agentes de la CUENTA (miembros de cualquier
-  # inbox), ordenados por user_id. Cache de 60s para no golpear la DB en
-  # cada mensaje entrante.
+  # Si el último asignado ya no existe en la lista (lo sacaron del equipo),
+  # NO reiniciamos en 0: retomamos desde el índice guardado. Así la fila
+  # sigue avanzando en vez de acaparar al primer agente.
+  def next_start_index(ordered)
+    last = redis.get(strict_pointer_key)
+    idx  = last ? ordered.index(last.to_s) : nil
+    return idx + 1 if idx
+
+    fallback = redis.get(strict_pointer_idx_key).to_i
+    fallback.clamp(0, ordered.size - 1)
+  end
+
   def stable_account_order
-    Rails.cache.fetch("strict_rr_order/#{inbox.account_id}", expires_in: 60.seconds) do
+    Rails.cache.fetch("strict_rr_order/#{inbox.account_id}", expires_in: 30.seconds) do
       InboxMember.joins(:inbox)
                  .where(inboxes: { account_id: inbox.account_id })
                  .distinct
@@ -69,35 +87,33 @@ class AutoAssignment::InboxRoundRobinService
     end
   end
 
-  # Lock atomico: sin esto, dos jobs de Sidekiq simultaneos leen el mismo
-  # puntero y asignan la conversacion al MISMO agente.
+  # Lock atómico. Si NO se adquiere, abortamos (devolvemos nil) en lugar de
+  # ejecutar sin exclusión mutua: Chatwoot reintenta la asignación después.
   def with_pointer_lock
-    token    = SecureRandom.uuid
-    acquired = false
+    token = SecureRandom.uuid
 
-    20.times do
-      acquired = ::Redis::Alfred.with_redis { |r| r.set(lock_key, token, nx: true, ex: 5) }
-      break if acquired
+    acquired = LOCK_RETRIES.times.any? do
+      break true if redis.set(lock_key, token, nx: true, ex: LOCK_TTL)
 
-      sleep 0.05
+      sleep LOCK_BACKOFF
+      false
+    end
+
+    unless acquired
+      Rails.logger.warn("[StrictRR] lock no adquirido para account #{inbox.account_id}")
+      return nil
     end
 
     yield
   ensure
-    ::Redis::Alfred.with_redis do |r|
-      r.del(lock_key) if r.get(lock_key) == token
-    end
+    redis.eval(UNLOCK_SCRIPT, keys: [lock_key], argv: [token]) if acquired
   end
 
-  def lock_key
-    "STRICT_RR_LOCK::ACCOUNT::#{inbox.account_id}"
-  end
+  def lock_key              = "STRICT_RR_LOCK::ACCOUNT::#{inbox.account_id}"
+  def strict_pointer_key    = "STRICT_RR_POINTER::ACCOUNT::#{inbox.account_id}"
+  def strict_pointer_idx_key = "STRICT_RR_POINTER_IDX::ACCOUNT::#{inbox.account_id}"
 
-  def strict_pointer_key
-    "STRICT_RR_POINTER::ACCOUNT::#{inbox.account_id}"
-  end
-
-  # ---- se conservan por compatibilidad con los listeners de cola ----
+  # ---- compatibilidad con los listeners de cola de Chatwoot ----
   def pop_push_to_queue(user_id)
     return if user_id.blank?
 
@@ -106,7 +122,7 @@ class AutoAssignment::InboxRoundRobinService
   end
 
   def validate_queue?
-    return true if inbox.inbox_members.map(&:user_id).sort == queue.map(&:to_i).sort
+    inbox.inbox_members.map(&:user_id).sort == queue.map(&:to_i).sort
   end
 
   def queue

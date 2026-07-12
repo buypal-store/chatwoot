@@ -1,19 +1,12 @@
 class AutoAssignment::InboxRoundRobinService
   pattr_initialize [:inbox!]
 
-  LOCK_TTL      = 5      # segundos
-  LOCK_RETRIES  = 20
-  LOCK_BACKOFF  = 0.05
+  LOCK_TTL     = 5     # segundos que vive el lock en Redis
+  LOCK_SAFETY  = 1     # margen: si tardé más de (TTL - SAFETY), no borro
+  LOCK_RETRIES = 20
+  LOCK_BACKOFF = 0.05  # 20 * 0.05 = hasta 1s esperando el turno
 
-  # Libera el lock solo si sigue siendo nuestro. Atómico.
-  UNLOCK_SCRIPT = <<~LUA.freeze
-    if redis.call("get", KEYS[1]) == ARGV[1] then
-      return redis.call("del", KEYS[1])
-    else
-      return 0
-    end
-  LUA
-
+  # ---- gestión de cola (listeners de Chatwoot) ----
   def clear_queue
     ::Redis::Alfred.delete(round_robin_key)
   end
@@ -40,7 +33,7 @@ class AutoAssignment::InboxRoundRobinService
   private
 
   def redis
-    $alfred # ConnectionPool::Wrapper con namespace. No hace falta parchear Alfred.
+    $alfred
   end
 
   # === FILA INDIA ESTRICTA, GLOBAL POR CUENTA ===
@@ -64,16 +57,14 @@ class AutoAssignment::InboxRoundRobinService
     end
   end
 
-  # Si el último asignado ya no existe en la lista (lo sacaron del equipo),
-  # NO reiniciamos en 0: retomamos desde el índice guardado. Así la fila
-  # sigue avanzando en vez de acaparar al primer agente.
+  # Si al último asignado lo sacaron del equipo, NO reiniciamos en 0
+  # (eso haría que el primer agente acapare todo). Retomamos por índice.
   def next_start_index(ordered)
     last = redis.get(strict_pointer_key)
     idx  = last ? ordered.index(last.to_s) : nil
     return idx + 1 if idx
 
-    fallback = redis.get(strict_pointer_idx_key).to_i
-    fallback.clamp(0, ordered.size - 1)
+    redis.get(strict_pointer_idx_key).to_i.clamp(0, ordered.size - 1)
   end
 
   def stable_account_order
@@ -87,33 +78,55 @@ class AutoAssignment::InboxRoundRobinService
     end
   end
 
-  # Lock atómico. Si NO se adquiere, abortamos (devolvemos nil) en lugar de
-  # ejecutar sin exclusión mutua: Chatwoot reintenta la asignación después.
+  # Lock atómico SIN Lua.
+  # - Adquirir: SET NX EX  -> atómico de verdad, y respeta el namespace.
+  # - Liberar : DEL simple, pero SOLO si tardé menos que el TTL. Si tardé más,
+  #             el lock ya pudo expirar y ser de otro worker: no lo toco y
+  #             dejo que Redis lo limpie solo. Nunca borro un lock ajeno.
   def with_pointer_lock
-    token = SecureRandom.uuid
+    token       = SecureRandom.uuid
+    acquired    = false
+    acquired_at = nil
 
-    acquired = LOCK_RETRIES.times.any? do
-      break true if redis.set(lock_key, token, nx: true, ex: LOCK_TTL)
-
+    LOCK_RETRIES.times do
+      if redis.set(lock_key, token, nx: true, ex: LOCK_TTL)
+        acquired    = true
+        acquired_at = monotonic_now
+        break
+      end
       sleep LOCK_BACKOFF
-      false
     end
 
     unless acquired
-      Rails.logger.warn("[StrictRR] lock no adquirido para account #{inbox.account_id}")
-      return nil
+      Rails.logger.warn("[StrictRR] lock no adquirido (account #{inbox.account_id})")
+      return nil # abortamos: mejor no asignar que asignar doble
     end
 
     yield
   ensure
-    redis.eval(UNLOCK_SCRIPT, keys: [lock_key], argv: [token]) if acquired
+    if acquired && (monotonic_now - acquired_at) < (LOCK_TTL - LOCK_SAFETY)
+      redis.del(lock_key)
+    end
   end
 
-  def lock_key              = "STRICT_RR_LOCK::ACCOUNT::#{inbox.account_id}"
-  def strict_pointer_key    = "STRICT_RR_POINTER::ACCOUNT::#{inbox.account_id}"
-  def strict_pointer_idx_key = "STRICT_RR_POINTER_IDX::ACCOUNT::#{inbox.account_id}"
+  # Reloj monotónico: inmune a ajustes de NTP / cambios de hora del sistema.
+  def monotonic_now
+    Process.clock_gettime(Process::CLOCK_MONOTONIC)
+  end
 
-  # ---- compatibilidad con los listeners de cola de Chatwoot ----
+  def lock_key
+    "STRICT_RR_LOCK::ACCOUNT::#{inbox.account_id}"
+  end
+
+  def strict_pointer_key
+    "STRICT_RR_POINTER::ACCOUNT::#{inbox.account_id}"
+  end
+
+  def strict_pointer_idx_key
+    "STRICT_RR_POINTER_IDX::ACCOUNT::#{inbox.account_id}"
+  end
+
+  # ---- compatibilidad ----
   def pop_push_to_queue(user_id)
     return if user_id.blank?
 

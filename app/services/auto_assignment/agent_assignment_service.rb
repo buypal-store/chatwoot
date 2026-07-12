@@ -37,21 +37,28 @@ class AutoAssignment::AgentAssignmentService
 
     cutoff = now - PRESENCE_GRACE.to_i
     redis.hgetall(last_seen_key).select { |_uid, ts| ts.to_i >= cutoff }.keys
+  rescue StandardError
+    []
   end
 
-  # CORREGIDO: la disponibilidad declarada vive en account_users, NO en users.
+  # La disponibilidad DECLARADA vive en account_users, no en users.
+  # Blindado: si la columna no existe en esta version, no rompe nada.
   def explicitly_offline_ids
     candidate_ids = (live_agent_ids | recently_seen_agent_ids).map(&:to_i)
     return [] if candidate_ids.blank?
+    return [] unless AccountUser.column_names.include?('availability')
 
     AccountUser.where(account_id: conversation.account_id,
                       user_id: candidate_ids,
                       availability: :offline)
                .pluck(:user_id).map(&:to_s)
+  rescue StandardError => e
+    Rails.logger.error("[StrictRR] offline check fallo: #{e.message}")
+    []
   end
 
   def online_agent_ids
-    ((live_agent_ids | recently_seen_agent_ids).uniq - explicitly_offline_ids)
+    (live_agent_ids | recently_seen_agent_ids).uniq - explicitly_offline_ids
   end
 
   def allowed_online_agent_ids

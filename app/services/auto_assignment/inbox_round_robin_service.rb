@@ -1,7 +1,6 @@
 class AutoAssignment::InboxRoundRobinService
   pattr_initialize [:inbox!]
 
-  # ---- gestión de cola (listeners nativos de Chatwoot) ----
   def clear_queue
     ::Redis::Alfred.delete(round_robin_key)
   end
@@ -19,7 +18,6 @@ class AutoAssignment::InboxRoundRobinService
     add_agent_to_queue(inbox.inbox_members.map(&:user_id))
   end
 
-  # allowed_agent_ids: agentes ONLINE y permitidos, ya filtrados por el caller.
   def available_agent(allowed_agent_ids: [])
     user_id = next_user_id(allowed_agent_ids)
     inbox.inbox_members.find_by(user_id: user_id)&.user if user_id.present?
@@ -27,40 +25,36 @@ class AutoAssignment::InboxRoundRobinService
 
   private
 
-  def redis
-    $alfred
+  # $alfred es un ConnectionPool PELADO (no ::Wrapper): NO responde a .get/.incr.
+  # Hay que sacar una conexion con .with o revienta con NoMethodError.
+  def with_redis(&block)
+    $alfred.with(&block)
   end
 
   # === FILA INDIA ESTRICTA, GLOBAL POR CUENTA, SIN LOCK ===
-  #
-  # INCR es atomico en Redis: dos jobs concurrentes NUNCA reciben el mismo
-  # cursor. Eso elimina la doble asignacion sin necesidad de locks, sleeps
-  # ni scripts Lua. El cursor solo sube; el modulo lo mapea a la posicion.
+  # INCR es atomico: dos jobs concurrentes nunca reciben el mismo cursor.
   def next_user_id(allowed_agent_ids)
     return nil if allowed_agent_ids.blank?
 
     allowed = Array(allowed_agent_ids).map(&:to_s)
     ordered = stable_account_order
-    ordered = allowed if ordered.blank? # fallback si la DB/cache falla
+    ordered = allowed if ordered.blank?
     return nil if ordered.blank?
 
-    cursor = redis.incr(cursor_key)
-    redis.expire(cursor_key, 30.days.to_i)
+    cursor = with_redis do |r|
+      c = r.incr(cursor_key)
+      r.expire(cursor_key, 30.days.to_i)
+      c
+    end
 
     start = cursor % ordered.size
 
-    # Recorre circularmente desde la posicion del turno y toma el primer
-    # agente que este ONLINE y permitido. Si nadie del orden global esta
-    # disponible, cae al primero permitido (nunca devuelve nil por error).
     ordered.rotate(start).find { |uid| allowed.include?(uid) } || allowed.first
   rescue StandardError => e
-    # NUNCA romper la asignacion en produccion por un fallo de Redis/DB.
-    Rails.logger.error("[StrictRR] fallback: #{e.class} #{e.message}")
+    Rails.logger.error("[StrictRR] FALLBACK ALEATORIO: #{e.class} #{e.message}")
     Array(allowed_agent_ids).map(&:to_s).sample
   end
 
-  # Orden estable de TODOS los agentes de la CUENTA, por user_id.
-  # Cache corto para no golpear la DB en cada mensaje entrante.
   def stable_account_order
     Rails.cache.fetch("strict_rr_order/#{inbox.account_id}", expires_in: 30.seconds) do
       InboxMember.joins(:inbox)
@@ -76,7 +70,7 @@ class AutoAssignment::InboxRoundRobinService
     "STRICT_RR_CURSOR::ACCOUNT::#{inbox.account_id}"
   end
 
-  # ---- compatibilidad con los listeners de cola ----
+  # ---- compatibilidad con listeners nativos ----
   def pop_push_to_queue(user_id)
     return if user_id.blank?
 

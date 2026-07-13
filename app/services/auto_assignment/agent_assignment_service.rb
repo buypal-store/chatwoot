@@ -1,8 +1,8 @@
 class AutoAssignment::AgentAssignmentService
-  # Allowed agent ids: array
-  # This is the list of agents from which an agent can be assigned to this conversation
-  # examples: Agents with assignment capacity, Agents who are members of a team etc
   pattr_initialize [:conversation!, :allowed_agent_ids!]
+
+  PRESENCE_GRACE      = 5.minutes
+  ASSIGNABLE_STATUSES = %w[online busy].freeze
 
   def find_assignee
     round_robin_manage_service.available_agent(allowed_agent_ids: allowed_online_agent_ids)
@@ -15,24 +15,63 @@ class AutoAssignment::AgentAssignmentService
 
   private
 
+  def with_redis(&block)
+    $alfred.with(&block)
+  end
+
+  def presence_statuses
+    @presence_statuses ||= OnlineStatusTracker.get_available_users(conversation.account_id) || {}
+  end
+
+  def live_agent_ids
+    @live_agent_ids ||= presence_statuses
+                        .select { |_uid, status| ASSIGNABLE_STATUSES.include?(status) }
+                        .keys.map(&:to_s)
+  end
+
+  def recently_seen_agent_ids
+    now = Time.now.to_i
+
+    with_redis do |r|
+      live_agent_ids.each { |uid| r.hset(last_seen_key, uid, now) }
+      r.expire(last_seen_key, 1.day.to_i)
+
+      cutoff = now - PRESENCE_GRACE.to_i
+      r.hgetall(last_seen_key).select { |_uid, ts| ts.to_i >= cutoff }.keys
+    end
+  rescue StandardError => e
+    Rails.logger.error("[StrictRR] last_seen fallo: #{e.class} #{e.message}")
+    []
+  end
+
+  # La disponibilidad DECLARADA vive en account_users, no en users.
+  def explicitly_offline_ids
+    candidate_ids = (live_agent_ids | recently_seen_agent_ids).map(&:to_i)
+    return [] if candidate_ids.blank?
+    return [] unless AccountUser.column_names.include?('availability')
+
+    AccountUser.where(account_id: conversation.account_id,
+                      user_id: candidate_ids,
+                      availability: :offline)
+               .pluck(:user_id).map(&:to_s)
+  rescue StandardError => e
+    Rails.logger.error("[StrictRR] offline check fallo: #{e.message}")
+    []
+  end
+
   def online_agent_ids
-    online_agents = OnlineStatusTracker.get_available_users(conversation.account_id)
-    online_agents.select { |_key, value| value.eql?('online') }.keys if online_agents.present?
+    (live_agent_ids | recently_seen_agent_ids).uniq - explicitly_offline_ids
   end
 
   def allowed_online_agent_ids
-    # We want to perform roundrobin only over online agents
-    # Hence taking an intersection of online agents and allowed member ids
+    @allowed_online_agent_ids ||= online_agent_ids & Array(allowed_agent_ids).map(&:to_s)
+  end
 
-    # the online user ids are string, since its from redis, allowed member ids are integer, since its from active record
-    @allowed_online_agent_ids ||= online_agent_ids & allowed_agent_ids&.map(&:to_s)
+  def last_seen_key
+    "AGENT_LAST_SEEN::ACCOUNT::#{conversation.account_id}"
   end
 
   def round_robin_manage_service
     @round_robin_manage_service ||= AutoAssignment::InboxRoundRobinService.new(inbox: conversation.inbox)
-  end
-
-  def round_robin_key
-    format(::Redis::Alfred::ROUND_ROBIN_AGENTS, inbox_id: conversation.inbox_id)
   end
 end

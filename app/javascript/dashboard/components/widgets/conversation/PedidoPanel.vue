@@ -2,7 +2,7 @@
   <div
     v-if="visible"
     class="fixed top-0 right-0 z-50 h-full bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col"
-    :style="{ width: '400px' }"
+    :style="{ width: '450px' }"
   >
     <!-- Barra fina oscura solo con X para cerrar -->
     <div class="flex items-center justify-end px-3 py-1 bg-slate-900 dark:bg-slate-900 border-b border-slate-800">

@@ -23,9 +23,10 @@ const store = useStore();
   
 // Colores por equipo
 const TEAM_COLORS = {
-  1: '#EAB308', // sento home — amarillo
-  2: '#3B82F6', // buypal — azul
-  3: '#EC4899', // babypal — rosa
+  1: '#FFDE21',   // sento home — amarillo
+  2: '#3B82F6',   // buypal — azul
+  3: '#EC4899',   // babypal — rosa
+  104: '#15803D', // strenko — verde 
 };
 
 const teamColor = computed(() => {

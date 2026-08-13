@@ -99,12 +99,6 @@ const hasSlaPolicyId = computed(
   () => props.chat?.applied_sla?.id && !currentContact.value?.blocked
 );
 
-const allLabels = computed(() => store.getters['labels/getLabels']);
-const getLabelColor = (title) => {
-  const label = allLabels.value.find(l => l.title === title);
-  return label?.color || '#888';
-};
-
 const copyConversationId = async () => {
   try {
     await copyTextToClipboard(String(props.chat.id));
@@ -118,7 +112,7 @@ const copyConversationId = async () => {
 <template>
   <div
     ref="conversationHeader"
-    class="flex flex-col gap-3 items-center justify-between flex-1 w-full min-w-0 xl:flex-row px-3 pt-3 pb-2 h-24 xl:h-12"
+    class="flex flex-col gap-3 items-start justify-between flex-1 w-full min-w-0 xl:flex-row px-3 pt-3 pb-2 min-h-12"
   >
     <div
       class="flex items-center justify-start w-full xl:w-auto max-w-full min-w-0 xl:flex-1"
@@ -170,16 +164,12 @@ const copyConversationId = async () => {
             {{ snoozedDisplayText }}
           </span>
         </div>
-        <!-- Etiquetas -->
-        <div v-if="chat.labels && chat.labels.length" class="flex flex-wrap gap-1 mt-0.5">
-          <span
-            v-for="label in chat.labels"
-            :key="label"
-            class="text-xxs px-1.5 py-0.5 rounded-full bg-n-alpha-1 text-n-slate-11 border border-n-slate-4"
-          >
-            {{ label }}
-          </span>
-        </div>
+       <!-- Etiquetas (estilo nativo de Chatwoot) -->
+        <CardLabels
+              v-if="chat.labels && chat.labels.length"
+              :conversation-labels="chat.labels"
+              class="mt-0.5"
+        />
       </div>
     </div>
     <div

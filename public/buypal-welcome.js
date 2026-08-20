@@ -10,15 +10,15 @@
 
   /* ================== CONFIG — lo único que editas ================== */
   var CONFIG = {
-    media:      '',                     // URL de GIF o video (mp4/webm/mov). Vacío = perrito SVG
+    media:      '/perrito-baile.mp4',                     // URL de GIF o video (mp4/webm/mov). Vacío = perrito SVG
     mensaje:    '¡Vamos {nombre}!',     // {nombre} = agente logueado
-    frase:      'Da lo mejor de ti :)', // texto de la ventanita del borde
+    frase:      'Una venta más que ayer 🚀', // texto de la ventanita del borde
     tiempo:     3,                      // seg que dura la tarjeta antes de volar
-    estilo:     'suave',               // suave | cohete | boomerang | tornado | pelota
-    formato:    'cuadrado',            // cuadrado | vertical (9:16)
-    piezas:     170,                   // confeti (0 = sin confeti)
+    estilo:     'cohete',               // suave | cohete | boomerang | tornado | pelota
+    formato:    'vertical',            // cuadrado | vertical (9:16)
+    piezas:     250,                   // confeti (0 = sin confeti)
     esquinas:   true,                  // 4 bailarines en las esquinas
-    tam:        130,                   // tamaño de los bailarines (px)
+    tam:        250,                   // tamaño de los bailarines (px)
     audio:      '',                    // URL de audio; vacío = pop sintetizado
     volumen:    70,                    // 0-100
     frecuencia: 'sesion',              // sesion | dia | siempre
@@ -26,7 +26,7 @@
 
     /* --- Panel de ventas del día (opcional · Supabase). Vacío = sin panel --- */
     supabaseUrl: 'https://fxwndndaabyktruigxal.supabase.co',
-    supabaseKey: '',                   // publishable (sb_publishable_...) o anon (eyJ...)
+    supabaseKey: 'sb_publishable_SneWwcbXYItpg1dIyjT0Kw_CinL31Jd',                   // publishable (sb_publishable_...) o anon (eyJ...)
     proxy:       '',                   // o webhook n8n que devuelva las filas
     tabla:       'pedidos',
     campo:       'agente',
@@ -36,6 +36,16 @@
 
   /* ================== CSS (se inyecta solo) ================== */
   var CSS = `
+    #wg-panel .wg-msg:empty{display:none}
+    #wg-panel .wg-fila .wg-nom{font-style:normal}
+  #wg-panel .wg-fila.wg-yo{background:#f0f7ff;border-radius:10px;padding:7px 9px;margin:0 -5px}
+  #wg-panel .wg-elegir{margin-top:12px;text-align:center}
+  #wg-panel .wg-elegir small{font-size:11px;color:#8494ab;display:block;margin-bottom:7px}
+  #wg-panel .wg-quien{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+  #wg-panel .wg-quien button{border:0;border-radius:9px;padding:6px 12px;font-size:12px;
+    font-weight:600;background:#eef2f7;color:#42536e;cursor:pointer;font-family:inherit}
+  #wg-panel .wg-quien button:hover{background:linear-gradient(135deg,#1f93ff,#7c4dff);color:#fff}
+  #wg-panel .wg-perrito-panel{width:140px;height:100px;border-radius:12px;display:block;margin:0 auto 8px;background:#eaf3ff;object-fit:cover}
   #wg-confeti{position:fixed;inset:0;z-index:99997;pointer-events:none}
   #wg-welcome{position:fixed;top:50%;left:50%;z-index:99999;pointer-events:none;
     transform:translate(-50%,-50%) scale(.55);opacity:0;
@@ -65,14 +75,18 @@
     55%{transform:translateY(-50%) scale(1.09)}100%{transform:translateY(-50%) scale(1)}}
   #wg-tab.wg-aterriza{animation:wg-aterriza .42s cubic-bezier(.3,1.4,.5,1) both}
   @media (prefers-reduced-motion:reduce){#wg-tab .wg-punto{animation:none}}
-  #wg-panel{position:fixed;right:14px;top:50%;z-index:99998;width:236px;
-    transform:translate(24px,-50%) scale(.94);opacity:0;visibility:hidden;background:#fff;
-    border-radius:18px;padding:18px 18px 20px;box-shadow:0 20px 55px rgba(11,18,32,.26);text-align:center;
-    transition:transform .35s cubic-bezier(.2,1.1,.35,1),opacity .28s,visibility .35s}
+  #wg-panel{position:fixed;right:14px;top:50%;z-index:99998;width:380px;
+  transform:translate(24px,-50%) scale(.94);opacity:0;visibility:hidden;background:#fff;
+  border-radius:18px;padding:18px 18px 20px;box-shadow:0 20px 55px rgba(11,18,32,.26);text-align:center;
+  transition:transform .35s cubic-bezier(.2,1.1,.35,1),opacity .28s,visibility .35s}
+#wg-panel .wg-cabecera{display:flex;gap:12px;align-items:flex-start;margin-bottom:8px}
+#wg-panel .wg-perrito-lateral{width:100px;height:80px;border-radius:10px;background:#eaf3ff;object-fit:cover;flex-shrink:0;display:block}
+#wg-panel .wg-cabecera-derecha{flex:1;text-align:left}
+#wg-panel .wg-cabecera-derecha p{margin:0 0 6px;font-size:13px;font-weight:700;color:#16233a;line-height:1.4}
   #wg-panel.wg-abierto{transform:translate(0,-50%) scale(1);opacity:1;visibility:visible}
   #wg-panel .wg-media{width:150px;height:150px;display:block;margin:0 auto;background:#eaf3ff;border-radius:14px;object-fit:cover}
   body.wg-vertical #wg-welcome .wg-media{width:176px;height:313px}
-  body.wg-vertical #wg-panel{width:200px}
+  body.wg-vertical #wg-panel{width:380px}
   body.wg-vertical #wg-panel .wg-media{width:132px;height:235px}
   body.wg-vertical #wg-fiesta .wg-bailarin{height:calc(var(--wg-tam,130px) * 16 / 9)}
   body.wg-vertical #wg-fiesta .wg-media{object-fit:cover}
@@ -327,7 +341,7 @@
   function limpiar() {
     timers.forEach(clearTimeout); timers = [];
     pararConfeti();
-    ['wg-welcome', 'wg-tab', 'wg-panel', 'wg-vuela', 'wg-fiesta'].forEach(function (id) {
+          ['wg-welcome', 'wg-tab', 'wg-panel', 'wg-vuela', 'wg-fiesta', 'wg-video-lateral'].forEach(function(id) {
       var e = document.getElementById(id); if (e) e.remove();
     });
   }
@@ -394,15 +408,13 @@
       return r.json();
     }).then(function (datos) {
       if (datos && !Array.isArray(datos)) datos = datos.filas || datos.data || [];
-      if (!datos.length) throw new Error('La consulta respondió vacío. Revisa la policy de SELECT sobre "' + SUPA.tabla + '" para el rol anon.');
+            if (!Array.isArray(datos)) datos = [];
       var acum = {};
       SUPA.vendedores.forEach(function (n) { acum[n] = { nombre: n, pedidos: 0, monto: 0, productos: 0, _vistos: {} }; });
       datos.forEach(function (fila) {
         var quien = fila[SUPA.campo], llave = null;
         for (var k in acum) { if (normal(k) === normal(quien)) { llave = k; break; } }
         if (!llave) return;
-        var estado = normal(fila.estado).toUpperCase();
-        if (SUPA.excluir.indexOf(estado) !== -1) return;
         var a = acum[llave];
         var pedido = fila.sync_id || ('id:' + fila.id);
         if (!a._vistos[pedido]) { a._vistos[pedido] = 1; a.pedidos += 1; }
@@ -439,39 +451,98 @@
     panel.id = 'wg-panel';
     panel.setAttribute('role', 'dialog');
     panel.setAttribute('aria-label', 'Mensaje del día');
+            var mediaTag = media(gifURL, false);
+    if (esVideo(gifURL)) {
+      mediaTag = '<video class="wg-perrito-lateral" src="' + gifURL + '" autoplay muted loop playsinline disablepictureinpicture></video>';
+    }
     panel.innerHTML = '<button class="wg-cerrar" type="button" aria-label="Cerrar">✕</button>' +
-      media(gifURL, false) + '<p></p>' +
+      '<div class="wg-cabecera">' + mediaTag +
+      '<div class="wg-cabecera-derecha"><p></p></div></div>' +
       (conVentas ? '<div class="wg-ventas"><div class="wg-cargando">Cargando ventas…</div></div>' : '');
-    panel.querySelector('p').textContent = frase;
     var zona = panel.querySelector('.wg-ventas');
 
-    function pintar(res) {
+            function pintar(res) {
       var yo = (AGENTE || '').trim();
+
+      /* ranking: más pedidos primero, desempate por monto */
+      var filas = res.filas.slice().sort(function (a, b) {
+        return (b.pedidos - a.pedidos) || (b.monto - a.monto);
+      });
+
       var tope = 1;
-      res.filas.forEach(function (f) { if (f.pedidos > tope) tope = f.pedidos; });
+      filas.forEach(function (f) { if (f.pedidos > tope) tope = f.pedidos; });
+
+      /* ¿cuál fila soy yo? */
       var mio = null;
-      res.filas.forEach(function (f) { if (normal(f.nombre) === normal(yo)) mio = f; });
-      var h = '';
+      var yoNorm = normal(yo), yoPrimero = yoNorm.split(' ')[0];
+      filas.forEach(function (f) {
+        var fn = normal(f.nombre);
+        if (fn === yoNorm || fn === yoPrimero || yoNorm.indexOf(fn) === 0) mio = f;
+      });
+
+      var pos = mio ? filas.indexOf(mio) + 1 : 0;
+
+      /* mensaje: solo para asesores, siempre en positivo */
+      var msg = '';
       if (mio) {
-        h += '<div class="wg-mio"><b>' + mio.pedidos + '</b>' +
-          '<small>' + (mio.pedidos === 1 ? 'venta hoy' : 'ventas hoy') + '</small>' +
-          '<span class="wg-monto">' + soles(mio.monto) + '</span></div>';
+        var pools = {
+          cero: [
+            'Hoy es página en blanco 🌱',
+            'La primera del día te está esperando 💪',
+            'Cada mañana es un nuevo comienzo ☀️',
+            'Listo para arrancar 🚀'
+          ],
+          lider: [
+            '¡Estás liderando, ' + mio.nombre + '! 🔥',
+            '¡Nadie te alcanza hoy, ' + mio.nombre + '! 🏆',
+            '¡Vas primero! Sigue con todo 🚀'
+          ],
+          bien: [
+            mio.pedidos + ' familias confiaron en ti hoy 💙',
+            '¡' + mio.pedidos + ' ventas! Vas construyendo tu día 🌟',
+            mio.pedidos + ' mamás felices gracias a ti 🤱',
+            'Ya llevas ' + soles(mio.monto) + ' hoy. ¡Bien ahí! ✨',
+            'Cada venta suma. Sigue así 💪'
+          ]
+        };
+        var pool = mio.pedidos === 0 ? pools.cero : (pos === 1 ? pools.lider : pools.bien);
+        msg = pool[Math.floor(Math.random() * pool.length)];
       }
-      h += '<div class="wg-rank">';
-      res.filas.forEach(function (f) {
+
+      /* cabecera: mensaje + mi contador */
+      var cabDer = panel.querySelector('.wg-cabecera-derecha');
+      if (cabDer) {
+        var mioHTML = '';
+        if (mio) {
+          mioHTML = '<div class="wg-mio" style="margin-top:4px;padding:8px 10px"><b>' + mio.pedidos + '</b>' +
+            '<small>' + (mio.pedidos === 1 ? 'venta hoy' : 'ventas hoy') + '</small>' +
+            '<span class="wg-monto">' + soles(mio.monto) + '</span></div>';
+        }
+        cabDer.innerHTML = '<p class="wg-msg"></p>' + mioHTML;
+        cabDer.querySelector('.wg-msg').textContent = msg;
+      }
+
+      /* tabla del equipo */
+      var med = ['🥇', '🥈', '🥉'];
+      var h = '<div class="wg-rank">';
+      filas.forEach(function (f, i) {
         var esYo = mio && f.nombre === mio.nombre;
         h += '<div class="wg-fila' + (esYo ? ' wg-yo' : '') + '">' +
-          '<div class="wg-top"><span></span><span>' + f.pedidos + ' · ' + soles(f.monto) + '</span></div>' +
+          '<div class="wg-top"><span>' + (med[i] || '') + ' <i class="wg-nom"></i></span>' +
+          '<span>' + f.pedidos + ' · ' + soles(f.monto) + '</span></div>' +
           '<div class="wg-barra"><i style="width:' + Math.round(f.pedidos / tope * 100) + '%"></i></div></div>';
       });
       h += '</div>';
+
       h += '<div class="wg-pie"><span>' + res.dia + '</span><button class="wg-recargar" type="button">Actualizar</button></div>';
       zona.innerHTML = h;
-      var filas = zona.querySelectorAll('.wg-fila .wg-top span:first-child');
-      for (var i = 0; i < filas.length; i++) filas[i].textContent = res.filas[i].nombre;
+
+      /* nombres por textContent (seguro ante caracteres raros) */
+      var nombres = zona.querySelectorAll('.wg-nom');
+      for (var i = 0; i < nombres.length; i++) nombres[i].textContent = filas[i].nombre;
+
       zona.querySelector('.wg-recargar').addEventListener('click', cargar);
     }
-
     function cargar() {
       if (!conVentas || !zona) return;
       zona.innerHTML = '<div class="wg-cargando">Cargando ventas…</div>';
@@ -595,29 +666,54 @@
     }
   }
 
-  /* ================== SECUENCIA ================== */
-  function arrancar() {
-    limpiar();
+  
+   /* ================== SECUENCIA ================== */
+  function aplicarConfig() {
     gifURL = (CONFIG.media || '').trim();
     document.body.classList.toggle('wg-vertical', CONFIG.formato === 'vertical');
-    var nombre = (AGENTE || CONFIG.nombre || 'crack');
-    var texto = (CONFIG.mensaje || '¡Vamos {nombre}!').replace('{nombre}', nombre);
-    var frase = CONFIG.frase || 'Da lo mejor de ti :)';
-    var espera = Math.max(1, parseFloat(CONFIG.tiempo) || 3) * 1000;
-    var estilo = CONFIG.estilo || 'suave';
-    var piezas = Math.max(0, parseInt(CONFIG.piezas, 10) || 0);
-    var esquinas = CONFIG.esquinas !== false;
-    var tam = Math.min(260, Math.max(60, parseInt(CONFIG.tam, 10) || 130));
-
-    SUPA.url = CONFIG.supabaseUrl || '';
-    SUPA.key = (CONFIG.supabaseKey || '').trim();
-    SUPA.proxy = (CONFIG.proxy || '').trim();
-    SUPA.tabla = CONFIG.tabla || 'pedidos';
-    SUPA.campo = CONFIG.campo || 'agente';
-    SUPA.base = CONFIG.base || 'created_at';
+    SUPA.url        = CONFIG.supabaseUrl || '';
+    SUPA.key        = (CONFIG.supabaseKey || '').trim();
+    SUPA.proxy      = (CONFIG.proxy || '').trim();
+    SUPA.tabla      = CONFIG.tabla || 'pedidos';
+    SUPA.campo      = CONFIG.campo || 'agente';
+    SUPA.base       = CONFIG.base || 'created_at';
     SUPA.vendedores = CONFIG.vendedores || SUPA.vendedores;
     audioURL = (CONFIG.audio || '').trim();
-    volumen = Math.min(1, Math.max(0, (parseInt(CONFIG.volumen, 10) || 0) / 100));
+    volumen  = Math.min(1, Math.max(0, (parseInt(CONFIG.volumen, 10) || 0) / 100));
+  }
+
+  /* Recarga: solo la pestaña, sin confeti ni tarjeta */
+  function soloTab() {
+    if (document.getElementById('wg-tab')) return;
+    aplicarConfig();
+    var tab = montarTab(CONFIG.frase || 'Da lo mejor de ti :)');
+    tab.classList.add('wg-visible', 'wg-aterriza');
+  }
+   /* saludo según la hora de Lima y el nombre del asesor */
+  function saludo(nombre) {
+    var corto = String(nombre).trim().split(' ')[0];
+    var h = new Date(Date.now() - 5 * 3600 * 1000).getUTCHours();
+    var momento = h < 12 ? 'Buenos días' : (h < 19 ? 'Buenas tardes' : 'Buenas noches');
+    var frases = [
+      momento + ', ' + corto + ' 👋',
+      '¡Qué bueno verte, ' + corto + '!',
+      momento + ', ' + corto + '. Hoy es tuyo 🚀',
+      '¡Vamos, ' + corto + '! 💪'
+    ];
+    return frases[Math.floor(Math.random() * frases.length)];
+  }
+  /* Primer ingreso: show completo */
+  function arrancar() {
+    limpiar();
+    aplicarConfig();
+    var nombre   = (AGENTE || CONFIG.nombre || 'crack');
+    var texto = saludo(nombre);
+    var frase    = CONFIG.frase || 'Da lo mejor de ti :)';
+    var espera   = Math.max(1, parseFloat(CONFIG.tiempo) || 3) * 1000;
+    var estilo   = CONFIG.estilo || 'suave';
+    var piezas   = Math.max(0, parseInt(CONFIG.piezas, 10) || 0);
+    var esquinas = CONFIG.esquinas !== false;
+    var tam      = Math.min(260, Math.max(60, parseInt(CONFIG.tam, 10) || 130));
 
     lanzarConfeti(piezas, espera + 1400);
     if (esquinas) montarFiesta(tam);
@@ -638,7 +734,6 @@
     }, Math.max(0, espera - 150)));
     timers.push(setTimeout(function () { volarHaciaTab(caja, frase, estilo); }, espera));
   }
-
   /* ================== ARRANQUE CONTROLADO ================== */
   function enDashboard() { return /\/app\/accounts\//.test(location.pathname); }
 
@@ -658,12 +753,39 @@
     } catch (e) {}
   }
 
-  /* nombre del agente logueado desde el perfil de Chatwoot */
+  
+   /* nombre del agente logueado — cookie de sesión de Chatwoot */
   function resolverAgente() {
-    return fetch('/api/v1/profile', { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (u) { return (u && (u.available_name || u.name)) || CONFIG.nombre; })
-      .catch(function () { return CONFIG.nombre; });
+    try {
+      var c = document.cookie.split(';').filter(function (x) {
+        return x.trim().indexOf('cw_d_session_info=') === 0;
+      })[0];
+      if (c) {
+        var s = JSON.parse(decodeURIComponent(c.split('=').slice(1).join('=')));
+        if (s && s['access-token']) {
+          return fetch('/api/v1/profile', {
+            headers: {
+              'access-token': s['access-token'],
+              'client':       s.client,
+              'uid':          s.uid,
+              'token-type':   'Bearer',
+              'Accept':       'application/json'
+            }
+          })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (u) {
+              return (u && (u.available_name || u.name)) || guardado();
+            })
+            .catch(function () { return guardado(); });
+        }
+      }
+    } catch (e) {}
+    return Promise.resolve(guardado());
+  }
+
+  function guardado() {
+    try { return localStorage.getItem('bp-agente') || CONFIG.nombre; }
+    catch (e) { return CONFIG.nombre; }
   }
 
   /* espera a que el dashboard SPA esté montado */
@@ -677,11 +799,17 @@
     })();
   }
 
-  // No correr dentro de iframes (p.ej. dashboard apps embebidas)
-  if (window.top === window.self && !yaVisto()) {
+    if (window.top === window.self) {
     cuandoListo(function () {
-      marcarVisto();
-      resolverAgente().then(function (n) { AGENTE = n; arrancar(); });
+      resolverAgente().then(function (n) {
+        AGENTE = n;
+        if (yaVisto()) {
+          soloTab();                      // recarga → solo el deslizante
+        } else {
+          marcarVisto();
+          arrancar();                     // primer ingreso → animación completa
+        }
+      });
     });
   }
 })();

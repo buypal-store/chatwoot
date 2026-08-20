@@ -36,7 +36,6 @@
 
   /* ================== CSS (se inyecta solo) ================== */
   var CSS = `
-    #wg-panel .wg-msg:empty{display:none}
     #wg-panel .wg-fila .wg-nom{font-style:normal}
   #wg-panel .wg-fila.wg-yo{background:#f0f7ff;border-radius:10px;padding:7px 9px;margin:0 -5px}
   #wg-panel .wg-elegir{margin-top:12px;text-align:center}
@@ -483,7 +482,7 @@
       var pos = mio ? filas.indexOf(mio) + 1 : 0;
 
       /* mensaje: solo para asesores, siempre en positivo */
-      var msg = '';
+      var msg = 'Ranking vendedores :)';
       if (mio) {
         var pools = {
           cero: [

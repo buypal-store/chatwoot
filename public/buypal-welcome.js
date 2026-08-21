@@ -13,14 +13,14 @@
     media:      '/perrito-baile.mp4',                     // URL de GIF o video (mp4/webm/mov). Vacío = perrito SVG
     mensaje:    '¡Vamos {nombre}!',     // {nombre} = agente logueado
     frase:      'Una venta más que ayer 🚀', // texto de la ventanita del borde
-    tiempo:     3,                      // seg que dura la tarjeta antes de volar
+    tiempo:     4,                      // seg que dura la tarjeta antes de volar
     estilo:     'cohete',               // suave | cohete | boomerang | tornado | pelota
     formato:    'vertical',            // cuadrado | vertical (9:16)
     piezas:     300,                   // confeti (0 = sin confeti)
     esquinas:   false,                  // 4 bailarines en las esquinas
     tam:        250,                   // tamaño de los bailarines (px)
-    audio:      '',                    // URL de audio; vacío = pop sintetizado
-    volumen:    70,                    // 0-100
+    audio:      '/sonido-perrito-bailando.mp3',                    // URL de audio; vacío = pop sintetizado
+    volumen:    30,                    // 0-100
     frecuencia: 'sesion',              // sesion | dia | siempre
     nombre:     'crack',               // fallback si no se lee el agente
 
@@ -145,6 +145,7 @@
   var timers = [], gifURL = '';
   var blobEsVideo = false;
   var ctxAudio = null, audioURL = '', volumen = 0.7, avisado = false;
+  var audioEl = null;    // ← nuevo
   var rafConfeti = null, medirConfeti = null;
 
   var SUPA = {
@@ -253,9 +254,10 @@
     if (volumen <= 0) return;
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     if (audioURL) {
-      var el = new Audio(audioURL);
-      el.volume = Math.min(1, volumen);
-      el.play().catch(function () { aviso(); });
+      if (audioEl) { audioEl.pause(); audioEl = null; }
+      audioEl = new Audio(audioURL);
+      audioEl.volume = Math.min(1, volumen);
+      audioEl.play().catch(function () { aviso(); });
       return;
     }
     var a = audio();
@@ -265,6 +267,19 @@
     pop(a, t, volumen * 0.9);
     pop(a, t + 0.13, volumen * 0.5);
     chispas(a, t, volumen, 16);
+  }
+    /* baja el volumen poco a poco y detiene */
+  function desvanecerAudio(ms) {
+    if (!audioEl) return;
+    var el = audioEl;
+    audioEl = null;
+    var pasos = 30, i = 0;
+    var v0 = el.volume;
+    var t = setInterval(function () {
+      i++;
+      el.volume = Math.max(0, v0 * (1 - i / pasos));
+      if (i >= pasos) { clearInterval(t); el.pause(); el.currentTime = 0; }
+    }, ms / pasos);
   }
 
   /* En el dashboard el agente ya interactuó al loguearse, así que
@@ -337,10 +352,11 @@
   }
 
   /* ================== LIMPIEZA ================== */
-  function limpiar() {
+    function limpiar() {
     timers.forEach(clearTimeout); timers = [];
     pararConfeti();
-          ['wg-welcome', 'wg-tab', 'wg-panel', 'wg-vuela', 'wg-fiesta', 'wg-video-lateral'].forEach(function(id) {
+    if (audioEl) { audioEl.pause(); audioEl = null; }
+    ['wg-welcome', 'wg-tab', 'wg-panel', 'wg-vuela', 'wg-fiesta', 'wg-video-lateral'].forEach(function(id) {
       var e = document.getElementById(id); if (e) e.remove();
     });
   }
@@ -731,7 +747,10 @@
     timers.push(setTimeout(function () {
       var s = caja.querySelector('span'); if (s) s.style.opacity = '0';
     }, Math.max(0, espera - 150)));
-    timers.push(setTimeout(function () { volarHaciaTab(caja, frase, estilo); }, espera));
+        timers.push(setTimeout(function () {
+      desvanecerAudio(1500);                  // fade de 1.5s mientras vuela
+      volarHaciaTab(caja, frase, estilo);
+    }, espera));
   }
   /* ================== ARRANQUE CONTROLADO ================== */
   function enDashboard() { return /\/app\/accounts\//.test(location.pathname); }

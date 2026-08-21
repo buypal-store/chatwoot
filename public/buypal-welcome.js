@@ -16,8 +16,8 @@
     tiempo:     3,                      // seg que dura la tarjeta antes de volar
     estilo:     'cohete',               // suave | cohete | boomerang | tornado | pelota
     formato:    'vertical',            // cuadrado | vertical (9:16)
-    piezas:     250,                   // confeti (0 = sin confeti)
-    esquinas:   true,                  // 4 bailarines en las esquinas
+    piezas:     300,                   // confeti (0 = sin confeti)
+    esquinas:   false,                  // 4 bailarines en las esquinas
     tam:        250,                   // tamaño de los bailarines (px)
     audio:      '',                    // URL de audio; vacío = pop sintetizado
     volumen:    70,                    // 0-100
@@ -798,7 +798,7 @@
     })();
   }
 
-    if (window.top === window.self) {
+      if (window.top === window.self) {
     cuandoListo(function () {
       resolverAgente().then(function (n) {
         AGENTE = n;
@@ -806,7 +806,7 @@
           soloTab();                      // recarga → solo el deslizante
         } else {
           marcarVisto();
-          arrancar();                     // primer ingreso → animación completa
+          setTimeout(arrancar, 3000);     // deja que Chatwoot termine de cargar
         }
       });
     });

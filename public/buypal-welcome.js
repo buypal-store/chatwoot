@@ -10,10 +10,10 @@
 
   /* ================== CONFIG — lo único que editas ================== */
   var CONFIG = {
-    media:      '/perrito-baile.mp4',                     // URL de GIF o video (mp4/webm/mov). Vacío = perrito SVG
+    media:      '/perrito-brazil.mp4',                     // URL de GIF o video (mp4/webm/mov). Vacío = perrito SVG
     mensaje:    '¡Vamos {nombre}!',     // {nombre} = agente logueado
     frase:      'Una venta más que ayer 🚀', // texto de la ventanita del borde
-    tiempo:     4,                      // seg que dura la tarjeta antes de volar
+    tiempo:     5,                      // seg que dura la tarjeta antes de volar
     estilo:     'cohete',               // suave | cohete | boomerang | tornado | pelota
     formato:    'vertical',            // cuadrado | vertical (9:16)
     piezas:     300,                   // confeti (0 = sin confeti)

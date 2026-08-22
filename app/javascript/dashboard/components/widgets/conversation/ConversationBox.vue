@@ -107,12 +107,12 @@ export default {
         'border-b border-b-n-weak !pt-2': !dashboardApps.length,
       }"
     />
-    <woot-tabs
+     <woot-tabs
       v-if="dashboardApps.length && currentChat.id"
       :index="activeIndex"
-      class="h-10"
+      class="items-end -mb-px [&>ul]:pt-2 [&>ul]:pb-0"
       @change="onDashboardAppTabChange"
-    >
+     >
       <woot-tabs-item
         v-for="tab in dashboardAppTabs"
         :key="tab.key"

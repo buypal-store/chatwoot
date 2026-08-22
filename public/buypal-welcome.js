@@ -750,11 +750,11 @@
     return frases[Math.floor(Math.random() * frases.length)];
   }
   /* Primer ingreso: show completo */
-  function arrancar() {
+    function arrancar() {
     limpiar();
     aplicarConfig();
     var nombre   = (AGENTE || CONFIG.nombre || 'crack');
-    var texto = saludo(nombre);
+    var texto    = saludo(nombre);
     var frase    = CONFIG.frase || 'Da lo mejor de ti :)';
     var espera   = Math.max(1, parseFloat(CONFIG.tiempo) || 3) * 1000;
     var estilo   = CONFIG.estilo || 'suave';
@@ -762,27 +762,48 @@
     var esquinas = CONFIG.esquinas !== false;
     var tam      = Math.min(260, Math.max(60, parseInt(CONFIG.tam, 10) || 130));
 
-    lanzarConfeti(piezas, espera + 1400);
-    if (esquinas) montarFiesta(tam);
-
     var caja = document.createElement('div');
     caja.id = 'wg-welcome';
+    caja.style.visibility = 'hidden';
     caja.innerHTML = '<div class="wg-card">' + media(gifURL, true) + '<span></span></div>';
     caja.querySelector('span').textContent = texto;
-    var visual = caja.querySelector('img, video');
-    if (visual) {
-      visual.addEventListener('error', function () { gifURL = ''; visual.outerHTML = perritoSVG(true, 'wg-media'); });
-      if (visual.tagName === 'VIDEO') { visual.muted = true; visual.play().catch(function () {}); }
-    }
     document.body.appendChild(caja);
 
-    timers.push(setTimeout(function () {
-      var s = caja.querySelector('span'); if (s) s.style.opacity = '0';
-    }, Math.max(0, espera - 150)));
-        timers.push(setTimeout(function () {
-      desvanecerAudio(1500);                  // fade de 1.5s mientras vuela
-      volarHaciaTab(caja, frase, estilo);
-    }, espera));
+     var visual = caja.querySelector('img, video');
+    if (visual) {
+      visual.addEventListener('error', function () {
+        gifURL = '';
+        var cont = caja.querySelector('.wg-card');
+        visual.remove();
+        cont.insertAdjacentHTML('afterbegin', perritoSVG(true, 'wg-media'));
+        mostrar();
+      });
+    }
+
+    function mostrar() {
+      if (caja.dataset.visible) return;
+      caja.dataset.visible = '1';
+      caja.style.visibility = '';
+      lanzarConfeti(piezas, espera + 1400);
+      if (esquinas) montarFiesta(tam);
+      timers.push(setTimeout(function () {
+        var s = caja.querySelector('span'); if (s) s.style.opacity = '0';
+      }, Math.max(0, espera - 150)));
+      timers.push(setTimeout(function () {
+        desvanecerAudio(1500);
+        volarHaciaTab(caja, frase, estilo);
+      }, espera));
+    }
+
+    if (visual && visual.tagName === 'VIDEO') {
+      visual.muted = true;
+      visual.play().catch(function () {});
+      if (visual.readyState >= 2) mostrar();
+      else visual.addEventListener('loadeddata', mostrar, { once: true });
+      timers.push(setTimeout(mostrar, 1500));
+    } else {
+      mostrar();
+    }
   }
   /* ================== ARRANQUE CONTROLADO ================== */
   function enDashboard() { return /\/app\/accounts\//.test(location.pathname); }
@@ -862,34 +883,56 @@
       });
     });
   }
-    /* ================== API PÚBLICA ================== */
+      /* ================== API PÚBLICA ================== */
   window.BuyPalWelcome = {
     celebrar: function (opciones) {
       opciones = opciones || {};
-      limpiar();
+
+      /* limpia solo lo de la animación anterior — la pestaña se queda */
+      timers.forEach(clearTimeout); timers = [];
+      pararConfeti();
+      if (audioEl) { audioEl.pause(); audioEl = null; }
+      var vieja = document.getElementById('wg-welcome');
+      if (vieja) vieja.remove();
       aplicarConfig();
 
       var espera = (opciones.tiempo || 4) * 1000;
       var piezas = opciones.piezas != null ? opciones.piezas : 250;
 
-      lanzarConfeti(piezas, espera + 1400);
-
       var caja = document.createElement('div');
       caja.id = 'wg-welcome';
+      caja.style.visibility = 'hidden';
       caja.innerHTML = '<div class="wg-card">' + media(gifURL, true) + '<span></span></div>';
       caja.querySelector('span').textContent = opciones.mensaje || '¡Pedido registrado! 🎉';
-      var v = caja.querySelector('video');
-      if (v) { v.muted = true; v.play().catch(function () {}); }
       document.body.appendChild(caja);
 
-      timers.push(setTimeout(function () {
-        desvanecerAudio(1500);
-        caja.classList.add('wg-despidiendo');
+      var v = caja.querySelector('video');
+
+      function mostrar() {
+        if (caja.dataset.visible) return;
+        caja.dataset.visible = '1';
+        caja.style.visibility = '';
+        lanzarConfeti(piezas, espera + 1400);
         timers.push(setTimeout(function () {
-          if (caja.parentNode) caja.remove();
-          soloTab();
-        }, 400));
-      }, espera));
+          desvanecerAudio(1500);
+          caja.classList.add('wg-despidiendo');
+          timers.push(setTimeout(function () {
+            if (caja.parentNode) caja.remove();
+            var rec = document.querySelector('#wg-panel .wg-recargar');
+            if (rec) rec.click();
+          }, 400));
+        }, espera));
+      }
+
+      if (v) {
+        v.muted = true;
+        v.play().catch(function () {});
+        if (v.readyState >= 2) mostrar();
+        else v.addEventListener('loadeddata', mostrar, { once: true });
+        timers.push(setTimeout(mostrar, 1200));
+      } else {
+        mostrar();
+      }
     },
     confeti: function (n) { lanzarConfeti(n || 250, 3000); },
     agente: function () { return AGENTE; }

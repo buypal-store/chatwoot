@@ -830,4 +830,47 @@
       });
     });
   }
+    /* ================== API PÚBLICA ================== */
+  window.BuyPalWelcome = {
+    celebrar: function (opciones) {
+      opciones = opciones || {};
+      limpiar();
+      aplicarConfig();
+
+      var espera = (opciones.tiempo || 4) * 1000;
+      var piezas = opciones.piezas != null ? opciones.piezas : 250;
+
+      lanzarConfeti(piezas, espera + 1400);
+
+      var caja = document.createElement('div');
+      caja.id = 'wg-welcome';
+      caja.innerHTML = '<div class="wg-card">' + media(gifURL, true) + '<span></span></div>';
+      caja.querySelector('span').textContent = opciones.mensaje || '¡Pedido registrado! 🎉';
+      var v = caja.querySelector('video');
+      if (v) { v.muted = true; v.play().catch(function () {}); }
+      document.body.appendChild(caja);
+
+      timers.push(setTimeout(function () {
+        desvanecerAudio(1500);
+        caja.classList.add('wg-despidiendo');
+        timers.push(setTimeout(function () {
+          if (caja.parentNode) caja.remove();
+          soloTab();
+        }, 400));
+      }, espera));
+    },
+    confeti: function (n) { lanzarConfeti(n || 250, 3000); },
+    agente: function () { return AGENTE; }
+  };
+
+  /* mensajes desde el panel de pedidos (iframe en GitHub Pages) */
+  window.addEventListener('message', function (e) {
+    if (e.origin !== 'https://buypal-store.github.io') return;
+    if (!e.data || e.data.tipo !== 'bp-celebrar') return;
+    window.BuyPalWelcome.celebrar({
+      mensaje: e.data.mensaje,
+      tiempo: e.data.tiempo,
+      piezas: e.data.piezas
+    });
+  });
 })();

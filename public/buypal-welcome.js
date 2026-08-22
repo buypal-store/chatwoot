@@ -78,9 +78,9 @@
   transform:translate(24px,-50%) scale(.94);opacity:0;visibility:hidden;background:#fff;
   border-radius:18px;padding:18px 18px 20px;box-shadow:0 20px 55px rgba(11,18,32,.26);text-align:center;
   transition:transform .35s cubic-bezier(.2,1.1,.35,1),opacity .28s,visibility .35s}
-#wg-panel .wg-cabecera{display:flex;gap:12px;align-items:flex-start;margin-bottom:8px}
-#wg-panel .wg-perrito-lateral{width:100px;height:80px;border-radius:10px;background:#eaf3ff;object-fit:cover;flex-shrink:0;display:block}
-#wg-panel .wg-cabecera-derecha{flex:1;text-align:left}
+#wg-panel .wg-cabecera{display:flex;gap:12px;align-items:stretch;margin-bottom:8px}
+#wg-panel .wg-perrito-lateral{width:80px;height:142px;border-radius:12px;background:#eaf3ff;object-fit:cover;flex-shrink:0;display:block;align-self:stretch}
+#wg-panel .wg-cabecera-derecha{flex:1;text-align:left;display:flex;flex-direction:column}
 #wg-panel .wg-cabecera-derecha p{margin:0 0 6px;font-size:13px;font-weight:700;color:#16233a;line-height:1.4}
   #wg-panel.wg-abierto{transform:translate(0,-50%) scale(1);opacity:1;visibility:visible}
   #wg-panel .wg-media{width:150px;height:150px;display:block;margin:0 auto;background:#eaf3ff;border-radius:14px;object-fit:cover}
@@ -129,6 +129,12 @@
   #wg-fiesta .wg-tr .wg-perro,#wg-fiesta .wg-tr .wg-bailando{animation-delay:-.31s}
   #wg-fiesta .wg-bl .wg-perro,#wg-fiesta .wg-bl .wg-bailando{animation-delay:-.15s}
   #wg-fiesta .wg-br .wg-perro,#wg-fiesta .wg-br .wg-bailando{animation-delay:-.46s}
+  #wg-panel .wg-nav{border:0;background:#eef2f7;color:#5c6b83;border-radius:8px;
+    padding:2px 9px;font-size:15px;line-height:1.2;cursor:pointer;font-family:inherit}
+  #wg-panel .wg-nav:hover:not(:disabled){background:#1f93ff;color:#fff}
+  #wg-panel .wg-nav:disabled{opacity:.35;cursor:default}
+  #wg-panel .wg-dia{flex:1;text-align:center}
+  #wg-panel .wg-mio{flex:1;display:flex;flex-direction:column;justify-content:center}
   @media (max-width:640px){#wg-fiesta .wg-bailarin{--wg-tam:84px}}
   @media (prefers-reduced-motion:reduce){
     #wg-welcome,.wg-bailando .wg-perro,img.wg-bailando,video.wg-bailando,
@@ -142,6 +148,7 @@
 
   /* ================== ESTADO ================== */
   var AGENTE = '';
+  var diasAtras = 0;   
   var timers = [], gifURL = '';
   var blobEsVideo = false;
   var ctxAudio = null, audioURL = '', volumen = 0.7, avisado = false;
@@ -388,8 +395,9 @@
   }
 
   /* ================== SUPABASE ================== */
-  function ventanaHoy() {
-    var ahora = new Date(Date.now() - 5 * 3600 * 1000);
+  function ventanaHoy(offset) {
+    offset = offset || 0;
+    var ahora = new Date(Date.now() - 5 * 3600 * 1000 - offset * 86400000);
     var dia = ahora.toISOString().slice(0, 10);
     var desde = new Date(dia + 'T00:00:00Z');
     desde.setUTCHours(desde.getUTCHours() + 5);
@@ -398,7 +406,7 @@
   }
 
   function traerVentas() {
-    var v = ventanaHoy();
+    var v = ventanaHoy(diasAtras);
     var campos = 'sync_id,id,estado,cantidad,precio_unitario,' + SUPA.campo;
     var filtro = SUPA.base === 'fecha'
       ? '&fecha=eq.' + v.dia
@@ -476,7 +484,7 @@
       (conVentas ? '<div class="wg-ventas"><div class="wg-cargando">Cargando ventas…</div></div>' : '');
     var zona = panel.querySelector('.wg-ventas');
 
-            function pintar(res) {
+    function pintar(res) {
       var yo = (AGENTE || '').trim();
 
       /* ranking: más pedidos primero, desempate por monto */
@@ -497,9 +505,9 @@
 
       var pos = mio ? filas.indexOf(mio) + 1 : 0;
 
-      /* mensaje: solo para asesores, siempre en positivo */
+      /* mensaje: solo para asesores y solo en el día de hoy */
       var msg = 'Ranking vendedores :)';
-      if (mio) {
+      if (mio && diasAtras === 0) {
         var pools = {
           cero: [
             'Hoy es página en blanco 🌱',
@@ -524,14 +532,21 @@
         msg = pool[Math.floor(Math.random() * pool.length)];
       }
 
-      /* cabecera: mensaje + mi contador */
+      /* cabecera: mensaje + contador (propio o del equipo) */
       var cabDer = panel.querySelector('.wg-cabecera-derecha');
       if (cabDer) {
-        var mioHTML = '';
+        var mioHTML;
         if (mio) {
           mioHTML = '<div class="wg-mio" style="margin-top:4px;padding:8px 10px"><b>' + mio.pedidos + '</b>' +
-            '<small>' + (mio.pedidos === 1 ? 'venta hoy' : 'ventas hoy') + '</small>' +
+            '<small>' + (mio.pedidos === 1 ? 'venta' : 'ventas') +
+            (diasAtras === 0 ? ' hoy' : '') + '</small>' +
             '<span class="wg-monto">' + soles(mio.monto) + '</span></div>';
+        } else {
+          var tot = 0, mon = 0;
+          filas.forEach(function (f) { tot += f.pedidos; mon += f.monto; });
+          mioHTML = '<div class="wg-mio" style="margin-top:4px;padding:8px 10px"><b>' + tot + '</b>' +
+            '<small>' + (tot === 1 ? 'venta del equipo' : 'ventas del equipo') + '</small>' +
+            '<span class="wg-monto">' + soles(mon) + '</span></div>';
         }
         cabDer.innerHTML = '<p class="wg-msg"></p>' + mioHTML;
         cabDer.querySelector('.wg-msg').textContent = msg;
@@ -549,12 +564,29 @@
       });
       h += '</div>';
 
-      h += '<div class="wg-pie"><span>' + res.dia + '</span><button class="wg-recargar" type="button">Actualizar</button></div>';
+      /* pie con navegación de días */
+      h += '<div class="wg-pie">' +
+        '<button class="wg-nav" data-n="1" type="button" title="Día anterior">‹</button>' +
+        '<span class="wg-dia">' + res.dia + '</span>' +
+        '<button class="wg-nav" data-n="-1" type="button" title="Día siguiente"' +
+          (diasAtras === 0 ? ' disabled' : '') + '>›</button>' +
+        '<button class="wg-recargar" type="button">↻</button>' +
+        '</div>';
       zona.innerHTML = h;
 
       /* nombres por textContent (seguro ante caracteres raros) */
       var nombres = zona.querySelectorAll('.wg-nom');
       for (var i = 0; i < nombres.length; i++) nombres[i].textContent = filas[i].nombre;
+
+      /* navegación de días */
+      var navs = zona.querySelectorAll('.wg-nav');
+      Array.prototype.forEach.call(navs, function (b) {
+        b.addEventListener('click', function () {
+          if (b.disabled) return;
+          diasAtras = Math.max(0, Math.min(30, diasAtras + Number(b.getAttribute('data-n'))));
+          cargar();
+        });
+      });
 
       zona.querySelector('.wg-recargar').addEventListener('click', cargar);
     }

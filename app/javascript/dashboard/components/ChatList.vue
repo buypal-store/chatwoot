@@ -567,40 +567,72 @@ function onToggleAdvanceFiltersModal() {
   showAdvancedFilters.value = true;
 }
 function onUrgentFilter() {
-  const currentUserId = store.getters['getCurrentUser']?.id;
-  const isAllTab = activeAssigneeTab.value === 'all';
-
-  const urgentPayload = [
+  const payload = [
     {
       attribute_key: 'priority',
       attribute_model: 'standard',
       custom_attribute_type: '',
       filter_operator: 'equal_to',
-      query_operator: isAllTab ? null : 'and',
+      query_operator: 'and',
       values: [{ id: 'urgent', name: 'Urgent' }],
+    },
+    {
+      attribute_key: 'status',
+      attribute_model: 'standard',
+      custom_attribute_type: '',
+      filter_operator: 'equal_to',
+      query_operator: 'and',
+      values: [{ id: activeStatus.value, name: activeStatus.value }],
     },
   ];
 
-  if (!isAllTab) {
-    urgentPayload.push({
+  // pestaña activa: Míos / Sin asignar / Todos
+  if (activeAssigneeTab.value === wootConstants.ASSIGNEE_TYPE.ME) {
+    payload.push({
       attribute_key: 'assignee_id',
       attribute_model: 'standard',
       custom_attribute_type: '',
       filter_operator: 'equal_to',
-      query_operator: null,
-      values: [{ id: currentUserId, name: '' }],
+      query_operator: 'and',
+      values: [currentUserDetails.value],
+    });
+  } else if (activeAssigneeTab.value === wootConstants.ASSIGNEE_TYPE.UNASSIGNED) {
+    payload.push({
+      attribute_key: 'assignee_id',
+      attribute_model: 'standard',
+      custom_attribute_type: '',
+      filter_operator: 'is_not_present',
+      query_operator: 'and',
+      values: [],
     });
   }
 
+  // contexto de la vista: equipo / bandeja / etiqueta
+  const contexto = initializeInboxTeamAndLabelFilterToModal(
+    props.conversationInbox,
+    inbox.value,
+    props.teamId,
+    activeTeam.value,
+    props.label
+  );
+  payload.push(...contexto);
+
+  // el último filtro nunca lleva query_operator
+  payload.forEach((f, i) => {
+    f.query_operator = i === payload.length - 1 ? null : 'and';
+  });
+
   resetBulkActions();
-  appliedFilter.value = urgentPayload;
+  appliedFilter.value = payload.map(useCamelCase);
   store.dispatch('conversationPage/reset');
   store.dispatch('emptyAllConversations');
-  store.dispatch('setConversationFilters', urgentPayload);
-  store.dispatch('fetchFilteredConversations', {
-  queryData: filterQueryGenerator(urgentPayload),
-  page: 1,
-}).then(emitConversationLoaded);
+  store.dispatch('setConversationFilters', payload);
+  store
+    .dispatch('fetchFilteredConversations', {
+      queryData: filterQueryGenerator(payload),
+      page: 1,
+    })
+    .then(emitConversationLoaded);
 }
 function fetchConversations() {
   store.dispatch('updateChatListFilters', conversationFilters.value);

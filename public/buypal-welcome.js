@@ -484,16 +484,16 @@
       (conVentas ? '<div class="wg-ventas"><div class="wg-cargando">Cargando ventas…</div></div>' : '');
     var zona = panel.querySelector('.wg-ventas');
 
-    function pintar(res) {
+        function pintar(res) {
       var yo = (AGENTE || '').trim();
 
-      /* ranking: más pedidos primero, desempate por monto */
+      /* ranking: mayor monto primero, desempate por cantidad de pedidos */
       var filas = res.filas.slice().sort(function (a, b) {
-        return (b.pedidos - a.pedidos) || (b.monto - a.monto);
+        return (b.monto - a.monto) || (b.pedidos - a.pedidos);
       });
 
       var tope = 1;
-      filas.forEach(function (f) { if (f.pedidos > tope) tope = f.pedidos; });
+      filas.forEach(function (f) { if (f.monto > tope) tope = f.monto; });
 
       /* ¿cuál fila soy yo? */
       var mio = null;
@@ -560,7 +560,7 @@
         h += '<div class="wg-fila' + (esYo ? ' wg-yo' : '') + '">' +
           '<div class="wg-top"><span>' + (med[i] || '') + ' <i class="wg-nom"></i></span>' +
           '<span>' + f.pedidos + ' · ' + soles(f.monto) + '</span></div>' +
-          '<div class="wg-barra"><i style="width:' + Math.round(f.pedidos / tope * 100) + '%"></i></div></div>';
+          '<div class="wg-barra"><i style="width:' + Math.round(f.monto / tope * 100) + '%"></i></div></div>';
       });
       h += '</div>';
 

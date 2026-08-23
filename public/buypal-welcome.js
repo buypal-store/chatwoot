@@ -31,7 +31,7 @@
     tabla:       'pedidos',
     campo:       'agente',
     base:        'created_at',         // created_at = cuándo se vendió · fecha = fecha del pedido
-    vendedores:  ['Wendy', 'Cesar', 'Gian']
+    vendedores:  ['Wendy', 'Cesar', 'Gian', 'Mesias'],
   };
 
   /* ================== CSS (se inyecta solo) ================== */
@@ -870,15 +870,19 @@
     })();
   }
 
-      if (window.top === window.self) {
+        if (window.top === window.self) {
     cuandoListo(function () {
       resolverAgente().then(function (n) {
         AGENTE = n;
-        if (yaVisto()) {
-          soloTab();                      // recarga → solo el deslizante
+        var yoP = normal(AGENTE).split(' ')[0];
+        var animado = (CONFIG.animar || CONFIG.vendedores || []).some(function (v) {
+          return normal(v) === yoP;
+        });
+        if (!animado || yaVisto()) {
+          soloTab();
         } else {
           marcarVisto();
-          setTimeout(arrancar, 3000);     // deja que Chatwoot termine de cargar
+          setTimeout(arrancar, 3000);
         }
       });
     });

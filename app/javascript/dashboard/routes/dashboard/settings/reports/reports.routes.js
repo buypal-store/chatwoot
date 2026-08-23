@@ -1,5 +1,6 @@
 import { frontendURL } from '../../../../helper/URLHelper';
 import { FEATURE_FLAGS } from 'dashboard/featureFlags';
+import InformeAsesores from './InformeAsesores.vue';
 
 import ReportsWrapper from './components/ReportsWrapper.vue';
 import Index from './Index.vue';
@@ -141,6 +142,12 @@ export default {
           name: 'account_overview_reports',
           meta,
           component: LiveReports,
+        },
+        {
+          path: 'asesores',
+          name: 'informe_asesores',
+          meta,
+          component: InformeAsesores,
         },
         {
           path: 'conversation',

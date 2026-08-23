@@ -63,17 +63,21 @@ export default {
       );
       const acum = {};
       filas.forEach(r => {
-        if (!acum[r.asesor]) acum[r.asesor] = { asesor: r.asesor, mensajes: 0, suma: 0 };
+        if (!acum[r.asesor]) {
+          acum[r.asesor] = { asesor: r.asesor, mensajes: 0, sumaProm: 0, sumaMed: 0 };
+        }
         acum[r.asesor].mensajes += r.mensajes;
-        acum[r.asesor].suma += r.mediana_min * r.mensajes;
+        acum[r.asesor].sumaProm += r.prom_min * r.mensajes;
+        acum[r.asesor].sumaMed += r.mediana_min * r.mensajes;
       });
       return Object.values(acum)
         .map(a => ({
           asesor: a.asesor,
           mensajes: a.mensajes,
-          mediana: a.mensajes ? Math.round((a.suma / a.mensajes) * 10) / 10 : 0,
+          promedio: a.mensajes ? Math.round((a.sumaProm / a.mensajes) * 10) / 10 : 0,
+          mediana: a.mensajes ? Math.round((a.sumaMed / a.mensajes) * 10) / 10 : 0,
         }))
-        .sort((a, b) => a.mediana - b.mediana);
+        .sort((a, b) => a.promedio - b.promedio);
     },
   },
   methods: {
@@ -264,10 +268,11 @@ export default {
             <tr>
               <th class="text-left font-medium px-4 py-2">Asesor</th>
               <th class="text-right font-medium px-4 py-2">Mensajes</th>
+              <th class="text-right font-medium px-4 py-2">Promedio</th>
               <th class="text-right font-medium px-4 py-2">Mediana</th>
             </tr>
           </thead>
-          <tbody>
+                   <tbody>
             <tr
               v-for="r in respuestaPorAsesor"
               :key="r.asesor"
@@ -275,10 +280,11 @@ export default {
             >
               <td class="px-4 py-2 font-medium">{{ r.asesor }}</td>
               <td class="px-4 py-2 text-right">{{ r.mensajes }}</td>
-              <td class="px-4 py-2 text-right">{{ fmt(r.mediana) }}</td>
+              <td class="px-4 py-2 text-right">{{ fmt(r.promedio) }}</td>
+              <td class="px-4 py-2 text-right text-n-slate-11">{{ fmt(r.mediana) }}</td>
             </tr>
             <tr v-if="!respuestaPorAsesor.length">
-              <td colspan="3" class="px-4 py-6 text-center text-n-slate-11">
+              <td colspan="4" class="px-4 py-6 text-center text-n-slate-11">
                 Sin datos en esta franja horaria
               </td>
             </tr>

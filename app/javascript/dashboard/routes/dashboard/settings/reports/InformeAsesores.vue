@@ -16,6 +16,7 @@ export default {
       porHora: [],
       tiempoRespuesta: [],
       canalFiltro: 'todos',
+      conversion: [],
       horaDesde: 0,
       horaHasta: 23,
     };
@@ -100,11 +101,13 @@ export default {
         this.porAsesor = d.por_asesor || [];
         this.porHora = d.por_hora || [];
         this.tiempoRespuesta = d.tiempo_respuesta || [];
+        this.conversion = d.conversion || []; 
       } catch (e) {
         this.error = e.message;
         this.porAsesor = [];
         this.porHora = [];
         this.tiempoRespuesta = [];
+        this.conversion = []; 
       } finally {
         this.cargando = false;
       }
@@ -281,6 +284,36 @@ export default {
             </tr>
           </tbody>
         </table>
+      </section>
+            <section class="border border-n-weak rounded-xl overflow-hidden">
+        <h3 class="px-4 py-3 text-sm font-semibold border-b border-n-weak">
+          Conversión a pedido
+        </h3>
+        <table class="w-full text-sm">
+          <thead class="bg-n-solid-2 text-n-slate-11">
+            <tr>
+              <th class="text-left font-medium px-4 py-2">Asesor</th>
+              <th class="text-right font-medium px-4 py-2">Conversaciones</th>
+              <th class="text-right font-medium px-4 py-2">Con pedido</th>
+              <th class="text-right font-medium px-4 py-2">Tasa</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="c in conversion" :key="c.asesor" class="border-t border-n-weak">
+              <td class="px-4 py-2 font-medium">{{ c.asesor }}</td>
+              <td class="px-4 py-2 text-right">{{ c.conversaciones }}</td>
+              <td class="px-4 py-2 text-right">{{ c.convertidas }}</td>
+              <td class="px-4 py-2 text-right font-semibold text-n-blue-11">{{ c.tasa }}%</td>
+            </tr>
+            <tr v-if="!conversion.length">
+              <td colspan="4" class="px-4 py-6 text-center text-n-slate-11">Sin datos</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="px-4 py-2 text-xs text-n-slate-11 border-t border-n-weak">
+          El vínculo pedido–conversación se registra desde el 23/08/2026.
+          Los períodos anteriores mostrarán 0%.
+        </p>
       </section>
     </template>
   </div>

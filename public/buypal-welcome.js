@@ -487,10 +487,15 @@
         function pintar(res) {
       var yo = (AGENTE || '').trim();
 
-      /* ranking: mayor monto primero, desempate por cantidad de pedidos */
-      var filas = res.filas.slice().sort(function (a, b) {
-        return (b.monto - a.monto) || (b.pedidos - a.pedidos);
-      });
+      /* fijos: siempre visibles aunque no hayan vendido. El resto solo si vendió */
+      var fijos = (CONFIG.animar || []).map(normal);
+      var filas = res.filas
+        .filter(function (f) {
+          return f.pedidos > 0 || fijos.indexOf(normal(f.nombre)) !== -1;
+        })
+        .sort(function (a, b) {
+          return (b.monto - a.monto) || (b.pedidos - a.pedidos);
+        });
 
       var tope = 1;
       filas.forEach(function (f) { if (f.monto > tope) tope = f.monto; });
@@ -498,7 +503,7 @@
       /* ¿cuál fila soy yo? */
       var mio = null;
       var yoNorm = normal(yo), yoPrimero = yoNorm.split(' ')[0];
-      filas.forEach(function (f) {
+      res.filas.forEach(function (f) {
         var fn = normal(f.nombre);
         if (fn === yoNorm || fn === yoPrimero || yoNorm.indexOf(fn) === 0) mio = f;
       });
@@ -543,7 +548,7 @@
             '<span class="wg-monto">' + soles(mio.monto) + '</span></div>';
         } else {
           var tot = 0, mon = 0;
-          filas.forEach(function (f) { tot += f.pedidos; mon += f.monto; });
+          res.filas.forEach(function (f) { tot += f.pedidos; mon += f.monto; });
           mioHTML = '<div class="wg-mio" style="margin-top:4px;padding:8px 10px"><b>' + tot + '</b>' +
             '<small>' + (tot === 1 ? 'venta del equipo' : 'ventas del equipo') + '</small>' +
             '<span class="wg-monto">' + soles(mon) + '</span></div>';

@@ -2,15 +2,29 @@
 import ReportHeader from './components/ReportHeader.vue';
 import ReportFilters from './components/ReportFilters.vue';
 
-const WEBHOOK = 'https://n8n.buypal.com.pe/webhook/reporte-asesores';
-// TODO: mover a variable de entorno o proxear por Rails. Ver nota de seguridad.
-const TOKEN = 'd9ba974ef4547b1f70445588f68668617246fc6410b1510a';
+// Config por entorno (Vite). Definir en .env / .env.production:
+//   VITE_INFORME_ASESORES_URL=https://n8n.buypal.com.pe/webhook/reporte-asesores
+//   VITE_INFORME_ASESORES_TOKEN=xxxxxxxx
+// Nunca commitear el token: el .env no va al repo.
+const WEBHOOK = import.meta.env.VITE_INFORME_ASESORES_URL || '';
+const TOKEN = import.meta.env.VITE_INFORME_ASESORES_TOKEN || '';
 
-const ALTO_GRAFICO = 170; // px utiles para las barras (200 del contenedor - label)
+const TIMEOUT_MS = 60000;
+const ALTO_GRAFICO = 170; // px útiles para las barras (200 del contenedor - etiqueta)
+
+// Toda suma pasa por aquí: un campo vacío del webhook no debe volverse NaN.
+const num = v => {
+  const x = Number(v);
+  return Number.isFinite(x) ? x : 0;
+};
+
+const BUCKETS = ['m15', 'm60', 'h2', 'h4', 'mas4h'];
 
 export default {
   name: 'InformeAsesores',
+
   components: { ReportHeader, ReportFilters },
+
   data() {
     return {
       cargando: false,
@@ -24,6 +38,7 @@ export default {
       horaHasta: 23,
     };
   },
+
   computed: {
     canales() {
       const set = new Set();
@@ -34,16 +49,18 @@ export default {
         });
       return ['todos', ...Array.from(set).sort()];
     },
-    // Normaliza el rango para que un desde > hasta no vacie el panel.
+
+    // Normaliza el rango para que un desde > hasta no vacíe el panel.
     rangoHoras() {
       return this.horaDesde <= this.horaHasta
         ? [this.horaDesde, this.horaHasta]
         : [this.horaHasta, this.horaDesde];
     },
+
+    // ── Conversaciones por asesor ────────────────────────────────────────────
     asesoresFiltrados() {
-      const filas = this.porCanal(this.porAsesor);
       const acum = {};
-      filas.forEach(f => {
+      this.porCanal(this.porAsesor).forEach(f => {
         if (!acum[f.asesor]) {
           acum[f.asesor] = {
             asesor: f.asesor,
@@ -52,27 +69,39 @@ export default {
             entrantes_cliente: 0,
           };
         }
-        acum[f.asesor].chats_nuevos += f.chats_nuevos;
-        acum[f.asesor].creados_por_asesor += f.creados_por_asesor;
-        acum[f.asesor].entrantes_cliente += f.entrantes_cliente;
+        acum[f.asesor].chats_nuevos += num(f.chats_nuevos);
+        acum[f.asesor].creados_por_asesor += num(f.creados_por_asesor);
+        acum[f.asesor].entrantes_cliente += num(f.entrantes_cliente);
       });
       return Object.values(acum).sort((a, b) => b.chats_nuevos - a.chats_nuevos);
     },
+
+    totalAsesores() {
+      return this.asesoresFiltrados.reduce(
+        (t, f) => ({
+          chats_nuevos: t.chats_nuevos + f.chats_nuevos,
+          creados_por_asesor: t.creados_por_asesor + f.creados_por_asesor,
+          entrantes_cliente: t.entrantes_cliente + f.entrantes_cliente,
+        }),
+        { chats_nuevos: 0, creados_por_asesor: 0, entrantes_cliente: 0 }
+      );
+    },
+
+    // ── Conversaciones por hora de ingreso ───────────────────────────────────
     horasFiltradas() {
       const [desde, hasta] = this.rangoHoras;
-      const filas = this.porCanal(this.porHora).filter(
-        h => h.hora >= desde && h.hora <= hasta
-      );
       const acum = {};
-      filas.forEach(h => {
-        if (!acum[h.hora]) {
-          acum[h.hora] = { hora: h.hora, entrantes: 0, salientes: 0 };
-        }
-        acum[h.hora].entrantes += h.entrantes;
-        acum[h.hora].salientes += h.salientes;
-      });
+      this.porCanal(this.porHora)
+        .filter(h => num(h.hora) >= desde && num(h.hora) <= hasta)
+        .forEach(h => {
+          const hora = num(h.hora);
+          if (!acum[hora]) acum[hora] = { hora, entrantes: 0, salientes: 0 };
+          acum[hora].entrantes += num(h.entrantes);
+          acum[hora].salientes += num(h.salientes);
+        });
       return Object.values(acum).sort((a, b) => a.hora - b.hora);
     },
+
     // Tope sobre la barra apilada completa: una sola escala para ambas series.
     topeHora() {
       return Math.max(
@@ -80,127 +109,167 @@ export default {
         ...this.horasFiltradas.map(h => h.entrantes + h.salientes)
       );
     },
+
     horaPico() {
       if (!this.horasFiltradas.length) return null;
       return this.horasFiltradas.reduce((a, b) =>
-        b.entrantes > a.entrantes ? b : a
+        b.entrantes + b.salientes > a.entrantes + a.salientes ? b : a
       );
     },
+
+    // ── Tiempos de respuesta ─────────────────────────────────────────────────
     respuestaPre() {
       return this.agrupaTiempo('preventa');
     },
+
     respuestaPost() {
       return this.agrupaTiempo('postventa');
     },
+
+    // ── Conversión a pedido ──────────────────────────────────────────────────
     conversionFiltrada() {
-      const filas = this.porCanal(this.conversion);
       const acum = {};
-      filas.forEach(c => {
+      this.porCanal(this.conversion).forEach(c => {
         if (!acum[c.asesor]) {
           acum[c.asesor] = { asesor: c.asesor, conversaciones: 0, convertidas: 0 };
         }
-        acum[c.asesor].conversaciones += c.conversaciones;
-        acum[c.asesor].convertidas += c.convertidas;
+        acum[c.asesor].conversaciones += num(c.conversaciones);
+        acum[c.asesor].convertidas += num(c.convertidas);
       });
       return Object.values(acum)
-        .map(a => ({
-          ...a,
-          tasa: a.conversaciones
-            ? Math.round((a.convertidas / a.conversaciones) * 1000) / 10
-            : 0,
-        }))
+        .map(a => ({ ...a, tasa: this.pct(a.convertidas, a.conversaciones) }))
         .sort((x, y) => y.tasa - x.tasa);
     },
+
+    totalConversion() {
+      const t = this.conversionFiltrada.reduce(
+        (a, c) => ({
+          conversaciones: a.conversaciones + c.conversaciones,
+          convertidas: a.convertidas + c.convertidas,
+        }),
+        { conversaciones: 0, convertidas: 0 }
+      );
+      return { ...t, tasa: this.pct(t.convertidas, t.conversaciones) };
+    },
   },
+
+  created() {
+    // No reactivo a propósito: solo controla la petición en vuelo.
+    this.peticion = null;
+  },
+
+  beforeUnmount() {
+    if (this.peticion) this.peticion.abort();
+  },
+
   methods: {
     porCanal(filas) {
       return this.canalFiltro === 'todos'
         ? filas
         : filas.filter(f => f.canal === this.canalFiltro);
     },
+
+    pct(parte, total) {
+      return total ? Math.round((parte / total) * 1000) / 10 : 0;
+    },
+
+    // Altura de barra con piso de 2px: un valor chico frente al pico del día
+    // se redondeaba a 0 y la barra desaparecía.
     alto(valor) {
-      return `${Math.round((valor / this.topeHora) * ALTO_GRAFICO)}px`;
+      if (!valor) return '0px';
+      return `${Math.max(2, Math.round((valor / this.topeHora) * ALTO_GRAFICO))}px`;
     },
-    fmt(min) {
-      if (min == null) return '—';
-      if (min < 60) return `${Math.round(min * 10) / 10} min`;
-      const total = Math.round(min);
-      const h = Math.floor(total / 60);
-      const m = total % 60;
-      return m ? `${h}h ${m}m` : `${h}h`;
-    },
-    // Fecha en zona local (Lima). toISOString() la convertia a UTC y corria un dia.
+
+    // Fecha en zona local (Lima). toISOString() la convertía a UTC y corría un día.
     aFecha(ts) {
       const d = new Date(ts * 1000);
       const p = n => String(n).padStart(2, '0');
       return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
     },
+
     agrupaTiempo(etapa) {
       const [desde, hasta] = this.rangoHoras;
       const filas = this.porCanal(this.tiempoRespuesta).filter(
-        r => r.etapa === etapa && r.hora >= desde && r.hora <= hasta
+        r =>
+          r.etapa === etapa && num(r.hora) >= desde && num(r.hora) <= hasta
       );
+
       const acum = {};
       filas.forEach(r => {
         if (!acum[r.asesor]) {
           acum[r.asesor] = {
             asesor: r.asesor,
             recibidos: 0,
+            sinResp: 0,
             m15: 0,
             m60: 0,
+            h2: 0,
             h4: 0,
-            sinResp: 0,
-            sumaProm: 0,
-            conProm: 0,
-            sumaMed: 0,
-            conMed: 0,
+            mas4h: 0,
           };
         }
         const a = acum[r.asesor];
-        a.recibidos += r.recibidos;
-        a.m15 += r.m15;
-        a.m60 += r.m60;
-        a.h4 += r.h4;
-        a.sinResp += r.sin_resp;
-        // Ponderacion por mensajes efectivamente respondidos, con contadores
-        // separados para que un prom_min null no diluya el promedio.
-        const resp = r.recibidos - r.sin_resp;
-        if (resp > 0) {
-          if (r.prom_min != null) {
-            a.sumaProm += r.prom_min * resp;
-            a.conProm += resp;
-          }
-          if (r.mediana_min != null) {
-            a.sumaMed += r.mediana_min * resp;
-            a.conMed += resp;
-          }
-        }
+        a.recibidos += num(r.recibidos);
+        a.sinResp += num(r.sin_resp);
+        BUCKETS.forEach(b => {
+          a[b] += num(r[b]);
+        });
       });
+
       return Object.values(acum)
-        .map(a => ({
-          asesor: a.asesor,
-          recibidos: a.recibidos,
-          m15: a.m15,
-          m60: a.m60,
-          h4: a.h4,
-          sinResp: a.sinResp,
-          promedio: a.conProm ? Math.round((a.sumaProm / a.conProm) * 10) / 10 : null,
-          mediana: a.conMed ? Math.round((a.sumaMed / a.conMed) * 10) / 10 : null,
-        }))
+        .map(a => ({ ...a, pct15: this.pct(a.m15, a.recibidos) }))
         .sort((a, b) => b.recibidos - a.recibidos);
     },
+
+    totalTiempo(filas) {
+      const t = filas.reduce(
+        (a, f) => {
+          const r = { recibidos: a.recibidos + f.recibidos, sinResp: a.sinResp + f.sinResp };
+          BUCKETS.forEach(b => {
+            r[b] = a[b] + f[b];
+          });
+          return r;
+        },
+        { recibidos: 0, sinResp: 0, m15: 0, m60: 0, h2: 0, h4: 0, mas4h: 0 }
+      );
+      return { ...t, pct15: this.pct(t.m15, t.recibidos) };
+    },
+
+    limpia() {
+      this.porAsesor = [];
+      this.porHora = [];
+      this.tiempoRespuesta = [];
+      this.conversion = [];
+    },
+
     async onFilterChange({ from, to }) {
+      if (!WEBHOOK || !TOKEN) {
+        this.error =
+          'Falta configurar VITE_INFORME_ASESORES_URL y VITE_INFORME_ASESORES_TOKEN en el entorno del build.';
+        this.limpia();
+        return;
+      }
+
+      // Una petición nueva cancela la anterior: al cambiar filtros rápido, la
+      // respuesta lenta de la primera pisaba los datos de la segunda.
+      if (this.peticion) this.peticion.abort();
+      this.peticion = new AbortController();
+      const ctrl = this.peticion;
+      const corte = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+
       this.cargando = true;
       this.error = '';
+
       try {
         const desde = this.aFecha(from);
-        // `to` que emite ReportFilters ya es fin del ultimo dia (23:59:59).
-        // +86400 => limite superior EXCLUSIVO. Si tu SQL en n8n usa <= o
-        // BETWEEN sobre fecha sin hora, quita el +86400.
+        // `to` que emite ReportFilters ya es fin del último día (23:59:59).
+        // +86400 => límite superior EXCLUSIVO. El SQL en n8n usa `< $2`.
         const hasta = this.aFecha(to + 86400);
-        const url = `${WEBHOOK}?token=${TOKEN}&desde=${desde}&hasta=${hasta}`;
-        const r = await fetch(url);
-        if (!r.ok) throw new Error(`El servidor respondió ${r.status}`);
+        const params = new URLSearchParams({ token: TOKEN, desde, hasta });
+
+        const r = await fetch(`${WEBHOOK}?${params}`, { signal: ctrl.signal });
+        if (r.status === 401) throw new Error('Token rechazado por el servidor.');
+        if (!r.ok) throw new Error(`El servidor respondió ${r.status}.`);
 
         let d = await r.json();
         if (Array.isArray(d)) d = d[0];
@@ -213,18 +282,32 @@ export default {
         this.tiempoRespuesta = d.tiempo_respuesta || [];
         this.conversion = d.conversion || [];
 
-        // Si el canal seleccionado no existe en el nuevo periodo, vuelve a Todos.
-        if (this.canalFiltro !== 'todos' && !this.canales.includes(this.canalFiltro)) {
+        // Si el canal seleccionado no existe en el nuevo período, vuelve a Todos.
+        if (
+          this.canalFiltro !== 'todos' &&
+          !this.canales.includes(this.canalFiltro)
+        ) {
           this.canalFiltro = 'todos';
         }
       } catch (e) {
+        if (e.name === 'AbortError') {
+          // Cancelada por una petición más reciente o por el timeout.
+          if (ctrl === this.peticion) {
+            this.error = 'El informe tardó demasiado. Vuelve a aplicar los filtros.';
+            this.limpia();
+          }
+          return;
+        }
+        // eslint-disable-next-line no-console
+        console.error('[InformeAsesores]', e);
         this.error = e.message;
-        this.porAsesor = [];
-        this.porHora = [];
-        this.tiempoRespuesta = [];
-        this.conversion = [];
+        this.limpia();
       } finally {
-        this.cargando = false;
+        clearTimeout(corte);
+        if (ctrl === this.peticion) {
+          this.peticion = null;
+          this.cargando = false;
+        }
       }
     },
   },
@@ -233,7 +316,6 @@ export default {
 
 <template>
   <ReportHeader header-title="Informe de asesores" />
-
   <div class="flex flex-col gap-6">
     <ReportFilters :show-entity-filter="false" @filter-change="onFilterChange" />
 
@@ -245,7 +327,7 @@ export default {
       v-else-if="error"
       class="p-4 rounded-lg bg-n-ruby-3 text-n-ruby-11 text-sm"
     >
-      No pude cargar el informe. {{ error }}
+      No se pudo cargar el informe. {{ error }}
     </div>
 
     <template v-else>
@@ -262,6 +344,7 @@ export default {
             </option>
           </select>
         </label>
+
         <label class="flex items-center gap-2 text-sm">
           <span class="text-n-slate-11 whitespace-nowrap">Horario</span>
           <select
@@ -282,19 +365,23 @@ export default {
             </option>
           </select>
         </label>
+
         <div v-if="horaPico" class="ml-auto text-sm text-n-slate-11">
           Hora pico
           <b class="text-n-blue-11">
             {{ String(horaPico.hora).padStart(2, '0') }}:00
           </b>
-          · {{ horaPico.entrantes }} mensajes
+          · {{ horaPico.entrantes + horaPico.salientes }} conversaciones
         </div>
       </div>
 
-      <!-- Tabla por asesor -->
+      <!-- Conversaciones por asesor -->
       <section class="border border-n-weak rounded-xl overflow-hidden">
         <h3 class="px-4 py-3 text-sm font-semibold border-b border-n-weak">
           Conversaciones por asesor
+          <span class="font-normal text-n-slate-11 text-xs">
+            · conversaciones nuevas en el período, no mensajes
+          </span>
         </h3>
         <table class="w-full text-sm">
           <thead class="bg-n-solid-2 text-n-slate-11">
@@ -302,7 +389,7 @@ export default {
               <th class="text-left font-medium px-4 py-2">Asesor</th>
               <th class="text-right font-medium px-4 py-2">Chats nuevos</th>
               <th class="text-right font-medium px-4 py-2">Creados por él/ella</th>
-              <th class="text-right font-medium px-4 py-2">Del cliente</th>
+              <th class="text-right font-medium px-4 py-2">Iniciados por el cliente</th>
             </tr>
           </thead>
           <tbody>
@@ -318,22 +405,38 @@ export default {
             </tr>
             <tr v-if="!asesoresFiltrados.length">
               <td colspan="4" class="px-4 py-6 text-center text-n-slate-11">
-                Sin datos en este período
+                No hay conversaciones en este período. Amplía el rango de fechas
+                o cambia de canal.
               </td>
             </tr>
           </tbody>
+          <tfoot v-if="asesoresFiltrados.length" class="bg-n-solid-2 font-semibold">
+            <tr class="border-t border-n-weak">
+              <td class="px-4 py-2">Total</td>
+              <td class="px-4 py-2 text-right">{{ totalAsesores.chats_nuevos }}</td>
+              <td class="px-4 py-2 text-right">
+                {{ totalAsesores.creados_por_asesor }}
+              </td>
+              <td class="px-4 py-2 text-right">
+                {{ totalAsesores.entrantes_cliente }}
+              </td>
+            </tr>
+          </tfoot>
         </table>
       </section>
 
-      <!-- Gráfico por hora -->
+      <!-- Conversaciones por hora de ingreso -->
       <section class="border border-n-weak rounded-xl p-4">
-        <h3 class="text-sm font-semibold mb-1">Mensajes por hora</h3>
+        <h3 class="text-sm font-semibold mb-1">
+          Conversaciones por hora de ingreso
+        </h3>
         <p class="text-xs text-n-slate-11 mb-4">
           <span class="inline-block w-3 h-2 rounded-sm bg-n-blue-9 align-middle" />
-          entrantes ·
+          iniciadas por el cliente ·
           <span class="inline-block w-3 h-2 rounded-sm bg-n-slate-6 align-middle" />
-          salientes
+          creadas por el asesor
         </p>
+
         <div class="flex items-end gap-1" style="height: 200px">
           <div
             v-for="h in horasFiltradas"
@@ -352,14 +455,15 @@ export default {
                      bg-n-solid-3 text-xs rounded-md px-2 py-1 shadow-lg z-10"
             >
               {{ String(h.hora).padStart(2, '0') }}:00 —
-              {{ h.entrantes }} entrantes / {{ h.salientes }} salientes
+              {{ h.entrantes }} del cliente / {{ h.salientes }} del asesor
             </div>
           </div>
+
           <div
             v-if="!horasFiltradas.length"
             class="w-full self-center text-center text-sm text-n-slate-11"
           >
-            Sin mensajes en esta franja
+            No entraron conversaciones en esta franja horaria.
           </div>
         </div>
       </section>
@@ -382,7 +486,7 @@ export default {
         class="border border-n-weak rounded-xl overflow-hidden"
       >
         <h3 class="px-4 py-3 text-sm font-semibold border-b border-n-weak">
-          {{ bloque.titulo }}
+          Tiempo de respuesta · {{ bloque.titulo }}
           <span class="font-normal text-n-slate-11 text-xs">
             · {{ bloque.sub }} ·
             {{ String(rangoHoras[0]).padStart(2, '0') }}:00–{{
@@ -394,13 +498,13 @@ export default {
           <thead class="bg-n-solid-2 text-n-slate-11">
             <tr>
               <th class="text-left font-medium px-3 py-2">Asesor</th>
-              <th class="text-right font-medium px-2 py-2">Recibidos</th>
+              <th class="text-right font-medium px-2 py-2">Mensajes</th>
               <th class="text-right font-medium px-2 py-2">&lt;15m</th>
               <th class="text-right font-medium px-2 py-2">15–60m</th>
-              <th class="text-right font-medium px-2 py-2">1–4h</th>
-              <th class="text-right font-medium px-2 py-2">Sin resp.</th>
-              <th class="text-right font-medium px-2 py-2">Promedio</th>
-              <th class="text-right font-medium px-3 py-2">Mediana</th>
+              <th class="text-right font-medium px-2 py-2">1–2h</th>
+              <th class="text-right font-medium px-2 py-2">2–4h</th>
+              <th class="text-right font-medium px-2 py-2">+4h / sin resp.</th>
+              <th class="text-right font-medium px-3 py-2">% &lt;15m</th>
             </tr>
           </thead>
           <tbody>
@@ -408,34 +512,58 @@ export default {
               v-for="r in bloque.filas"
               :key="r.asesor"
               class="border-t border-n-weak"
-              :class="r.asesor === 'Sin atender' ? 'bg-n-solid-2' : ''"
+              :class="r.asesor === 'Sin asignar' ? 'bg-n-solid-2' : ''"
             >
               <td class="px-3 py-2 font-medium">{{ r.asesor }}</td>
               <td class="px-2 py-2 text-right">{{ r.recibidos }}</td>
               <td class="px-2 py-2 text-right text-n-teal-11">{{ r.m15 || '—' }}</td>
               <td class="px-2 py-2 text-right">{{ r.m60 || '—' }}</td>
-              <td class="px-2 py-2 text-right text-n-slate-11">{{ r.h4 || '—' }}</td>
-              <td class="px-2 py-2 text-right text-n-ruby-11">
-                {{ r.sinResp || '—' }}
+              <td class="px-2 py-2 text-right">{{ r.h2 || '—' }}</td>
+              <td class="px-2 py-2 text-right text-n-slate-11">
+                {{ r.h4 || '—' }}
               </td>
-              <td class="px-2 py-2 text-right">{{ fmt(r.promedio) }}</td>
-              <td class="px-3 py-2 text-right text-n-slate-11">
-                {{ fmt(r.mediana) }}
+              <td
+                class="px-2 py-2 text-right text-n-ruby-11"
+                :title="`${r.sinResp} sin ninguna respuesta`"
+              >
+                {{ r.mas4h || '—' }}
               </td>
+              <td class="px-3 py-2 text-right font-semibold">{{ r.pct15 }}%</td>
             </tr>
             <tr v-if="!bloque.filas.length">
               <td colspan="8" class="px-4 py-6 text-center text-n-slate-11">
-                Sin datos en esta franja
+                No hay mensajes de clientes en esta franja.
               </td>
             </tr>
           </tbody>
+          <tfoot v-if="bloque.filas.length" class="bg-n-solid-2 font-semibold">
+            <tr class="border-t border-n-weak">
+              <td class="px-3 py-2">Total</td>
+              <td class="px-2 py-2 text-right">
+                {{ totalTiempo(bloque.filas).recibidos }}
+              </td>
+              <td class="px-2 py-2 text-right">{{ totalTiempo(bloque.filas).m15 }}</td>
+              <td class="px-2 py-2 text-right">{{ totalTiempo(bloque.filas).m60 }}</td>
+              <td class="px-2 py-2 text-right">{{ totalTiempo(bloque.filas).h2 }}</td>
+              <td class="px-2 py-2 text-right">{{ totalTiempo(bloque.filas).h4 }}</td>
+              <td class="px-2 py-2 text-right">
+                {{ totalTiempo(bloque.filas).mas4h }}
+              </td>
+              <td class="px-3 py-2 text-right">
+                {{ totalTiempo(bloque.filas).pct15 }}%
+              </td>
+            </tr>
+          </tfoot>
         </table>
       </section>
 
-      <!-- Conversión -->
+      <!-- Conversión a pedido -->
       <section class="border border-n-weak rounded-xl overflow-hidden">
         <h3 class="px-4 py-3 text-sm font-semibold border-b border-n-weak">
           Conversión a pedido
+          <span class="font-normal text-n-slate-11 text-xs">
+            · conversaciones que terminaron en pedido registrado
+          </span>
         </h3>
         <table class="w-full text-sm">
           <thead class="bg-n-solid-2 text-n-slate-11">
@@ -461,10 +589,22 @@ export default {
             </tr>
             <tr v-if="!conversionFiltrada.length">
               <td colspan="4" class="px-4 py-6 text-center text-n-slate-11">
-                Sin datos
+                No hay conversaciones en este período.
               </td>
             </tr>
           </tbody>
+          <tfoot v-if="conversionFiltrada.length" class="bg-n-solid-2 font-semibold">
+            <tr class="border-t border-n-weak">
+              <td class="px-4 py-2">Total</td>
+              <td class="px-4 py-2 text-right">
+                {{ totalConversion.conversaciones }}
+              </td>
+              <td class="px-4 py-2 text-right">{{ totalConversion.convertidas }}</td>
+              <td class="px-4 py-2 text-right text-n-blue-11">
+                {{ totalConversion.tasa }}%
+              </td>
+            </tr>
+          </tfoot>
         </table>
       </section>
     </template>

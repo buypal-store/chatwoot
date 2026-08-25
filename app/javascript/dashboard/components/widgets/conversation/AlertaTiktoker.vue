@@ -39,9 +39,9 @@ const POR_INBOX = {
   15: {
     marca: 'BuyPal',
     tiktokers: [
-      { id: 'sebastian', nombre: 'Aixa' },
-      { id: 'flavia', nombre: 'Alexandra' },
-      { id: 'freddy', nombre: 'Krisel' },
+      { id: 'sebastian', nombre: 'Sebastian' },
+      { id: 'flavia', nombre: 'Flavia' },
+      { id: 'freddy', nombre: 'Freddy' },
     ],
   },
     18: {

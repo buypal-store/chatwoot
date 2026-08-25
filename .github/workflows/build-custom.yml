@@ -33,3 +33,5 @@ jobs:
           build-args: |
             VITE_INFORME_ASESORES_URL=${{ vars.VITE_INFORME_ASESORES_URL }}
             VITE_INFORME_ASESORES_TOKEN=${{ secrets.VITE_INFORME_ASESORES_TOKEN }}
+            VITE_ALERTAS_URL=${{ vars.VITE_ALERTAS_URL }}
+            VITE_ALERTAS_TOKEN=${{ secrets.VITE_ALERTAS_TOKEN }}

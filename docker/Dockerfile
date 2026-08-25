@@ -80,6 +80,12 @@ COPY . /app
 # https://github.com/chatwoot/chatwoot/issues/701
 RUN mkdir -p /app/log
 
+# Informe de asesores (Vite las inyecta en build time)
+ARG VITE_INFORME_ASESORES_URL
+ARG VITE_INFORME_ASESORES_TOKEN
+ENV VITE_INFORME_ASESORES_URL=${VITE_INFORME_ASESORES_URL}
+ENV VITE_INFORME_ASESORES_TOKEN=${VITE_INFORME_ASESORES_TOKEN}
+
 # generate production assets if production environment
 RUN if [ "$RAILS_ENV" = "production" ]; then \
   SECRET_KEY_BASE=precompile_placeholder RAILS_LOG_TO_STDOUT=enabled bundle exec rake assets:precompile \

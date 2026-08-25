@@ -18,6 +18,7 @@ import { useAlert } from 'dashboard/composables';
 import { useI18n } from 'vue-i18n';
 import { copyTextToClipboard } from 'shared/helpers/clipboard';
 import CardLabels from '../conversation/conversationCardComponents/CardLabels.vue';
+import AlertaTiktoker from './AlertaTiktoker.vue';
 
 const props = defineProps({
   chat: {
@@ -183,6 +184,7 @@ const copyConversationId = async () => {
         class="hidden md:flex"
       />
       <ConversationCallButton :inbox="inbox" :chat="currentChat" />
+    <AlertaTiktoker :conversation-id="chat.id" :inbox-id="chat.inbox_id" />
 	<button
         class="inline-flex items-center min-w-0 gap-2 transition-all duration-100 ease-out border-0 rounded-lg outline-1 outline disabled:opacity-50 bg-n-button-color dark:hover:enabled:bg-n-solid-2 dark:focus-visible:bg-n-solid-2 hover:enabled:bg-n-alpha-2 focus-visible:bg-n-alpha-2 text-n-slate-12 outline-n-container h-8 px-3 text-sm justify-center"
         @click="emitter.emit('toggle-pedido-panel', { conversationId: chat.id, inboxId: inbox.id })"

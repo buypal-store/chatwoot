@@ -30,3 +30,6 @@ jobs:
           file: docker/Dockerfile
           push: true
           tags: ghcr.io/${{ github.repository }}:update-4.16.2-v3
+          build-args: |
+            VITE_INFORME_ASESORES_URL=${{ vars.VITE_INFORME_ASESORES_URL }}
+            VITE_INFORME_ASESORES_TOKEN=${{ secrets.VITE_INFORME_ASESORES_TOKEN }}

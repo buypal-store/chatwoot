@@ -10,8 +10,9 @@ class AutoAssignment::InboxRoundRobinService
     ::Redis::Alfred.lrem(round_robin_key, user_id)
   end
   def reset_queue
+    user_ids = inbox.inbox_members.map(&:user_id)
     clear_queue
-    add_agent_to_queue(inbox.inbox_members.map(&:user_id))
+    add_agent_to_queue(user_ids) if user_ids.any?
   end
   def available_agent(allowed_agent_ids: [])
     user_id = next_user_id(allowed_agent_ids)

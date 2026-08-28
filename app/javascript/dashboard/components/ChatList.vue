@@ -570,11 +570,15 @@ function onToggleAdvanceFiltersModal() {
 
   showAdvancedFilters.value = true;
 }
+const vistaActividad = ref(false);
+
 function onActividadFilter() {
-  // Orden por último mensaje entrante o saliente, como WhatsApp.
+  vistaActividad.value = !vistaActividad.value;
   resetBulkActions();
   appliedFilter.value = [];
-  activeSortBy.value = wootConstants.SORT_BY_TYPE.LAST_MESSAGE_DESC;
+  activeSortBy.value = vistaActividad.value
+    ? wootConstants.SORT_BY_TYPE.LAST_MESSAGE_DESC
+    : wootConstants.SORT_BY_TYPE.LAST_ACTIVITY_AT_DESC;
   store.dispatch('conversationPage/reset');
   store.dispatch('emptyAllConversations');
   store.dispatch('clearConversationFilters');
@@ -981,6 +985,7 @@ watch(conversationFilters, (newVal, oldVal) => {
       :is-on-expanded-layout="isOnExpandedLayout"
       :conversation-stats="conversationStats"
       :is-list-loading="chatListLoading && !conversationList.length"
+      :vista-actividad="vistaActividad"
       @add-folders="onClickOpenAddFoldersModal"
       @delete-folders="onClickOpenDeleteFoldersModal"
       @filters-modal="onToggleAdvanceFiltersModal"

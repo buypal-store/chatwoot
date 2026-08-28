@@ -16,6 +16,7 @@ const props = defineProps({
   isOnExpandedLayout: { type: Boolean, required: true },
   conversationStats: { type: Object, required: true },
   isListLoading: { type: Boolean, required: true },
+  vistaActividad: { type: Boolean, default: false },
 });
 
 const emit = defineEmits([
@@ -150,9 +151,9 @@ const toggleConversationLayout = () => {
           @click="emit('urgentFilter')"
         />
         <NextButton
-          v-tooltip.right="'Actividad de mensajes'"
+          v-tooltip.right="'Actividad Reciente'"
           icon="i-lucide-clock"
-          slate
+          v-bind="vistaActividad ? { blue: true } : { slate: true }"
           xs
           faded
           @click="emit('actividadFilter')"

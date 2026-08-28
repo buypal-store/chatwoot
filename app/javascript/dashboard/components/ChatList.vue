@@ -570,6 +570,17 @@ function onToggleAdvanceFiltersModal() {
 
   showAdvancedFilters.value = true;
 }
+function onActividadFilter() {
+  // Orden por último mensaje entrante o saliente, como WhatsApp.
+  resetBulkActions();
+  appliedFilter.value = [];
+  activeSortBy.value = wootConstants.SORT_BY_TYPE.LAST_MESSAGE_DESC;
+  store.dispatch('conversationPage/reset');
+  store.dispatch('emptyAllConversations');
+  store.dispatch('clearConversationFilters');
+  store.dispatch('setChatSortFilter', activeSortBy.value);
+  fetchConversations();
+}
 function onUrgentFilter() {
   const payload = [
     {
@@ -976,6 +987,7 @@ watch(conversationFilters, (newVal, oldVal) => {
       @reset-filters="resetAndFetchData"
       @basic-filter-change="onBasicFilterChange"
       @urgent-filter="onUrgentFilter"
+      @actividad-filter="onActividadFilter"
     />
 
     <TeleportWithDirection

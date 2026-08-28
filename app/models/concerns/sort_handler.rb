@@ -31,6 +31,16 @@ module SortHandler
     def sort_on_last_user_message_at
       order('grouped_conversations.message_type', 'grouped_conversations.created_at ASC')
     end
+    
+    def sort_on_last_message(_sort_direction = :desc)
+      order(
+        generate_sql_query(
+          '(SELECT MAX(m.created_at) FROM messages m ' \
+          'WHERE m.conversation_id = conversations.id ' \
+          'AND m.message_type IN (0,1) AND m.private = false) DESC NULLS LAST'
+        )
+      )
+    end
 
     private
 

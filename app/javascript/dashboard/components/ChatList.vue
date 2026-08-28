@@ -579,10 +579,10 @@ function onActividadFilter() {
   activeSortBy.value = vistaActividad.value
     ? wootConstants.SORT_BY_TYPE.LAST_MESSAGE_DESC
     : wootConstants.SORT_BY_TYPE.LAST_ACTIVITY_AT_DESC;
-  store.dispatch('conversationPage/reset');
-  store.dispatch('emptyAllConversations');
   store.dispatch('clearConversationFilters');
   store.dispatch('setChatSortFilter', activeSortBy.value);
+  store.dispatch('conversationPage/reset');
+  store.dispatch('emptyAllConversations');
   fetchConversations();
 }
 function onUrgentFilter() {

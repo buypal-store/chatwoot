@@ -25,6 +25,7 @@ const emit = defineEmits([
   'basicFilterChange',
   'filtersModal',
   'urgentFilter',
+  'actividadFilter',
 ]);
 
 const { uiSettings, updateUISettings } = useUISettings();
@@ -147,6 +148,14 @@ const toggleConversationLayout = () => {
           xs
           faded
           @click="emit('urgentFilter')"
+        />
+        <NextButton
+          v-tooltip.right="'Actividad de mensajes'"
+          icon="i-lucide-clock"
+          slate
+          xs
+          faded
+          @click="emit('actividadFilter')"
         />
         <NextButton
           id="toggleConversationFilterButton"

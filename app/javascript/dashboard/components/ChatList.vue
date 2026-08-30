@@ -6,7 +6,8 @@ import {
   useMapGetter,
   useFunctionGetter,
 } from 'dashboard/composables/store.js';
-
+import { matchesFilters } from '../store/modules/conversations/helpers/filterHelpers';
+import { sortComparator } from '../store/modules/conversations/helpers';
 import ChatListHeader from './ChatListHeader.vue';
 import ConversationList from './ConversationList.vue';
 import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
@@ -49,7 +50,6 @@ import {
   getUserPermissions,
   filterItemsByPermission,
 } from 'dashboard/helper/permissionsHelper.js';
-import { matchesFilters } from '../store/modules/conversations/helpers/filterHelpers';
 import { CONVERSATION_EVENTS } from '../helper/AnalyticsHelper/events';
 import { ASSIGNEE_TYPE_TAB_PERMISSIONS } from 'dashboard/constants/permissions.js';
 
@@ -351,6 +351,15 @@ const conversationList = computed(() => {
     activeSortBy.value === wootConstants.SORT_BY_TYPE.UNREAD
   ) {
     localConversationList = sortByUnreadStatus(localConversationList);
+  }
+
+  if (
+    !hasAppliedFiltersOrActiveFolders.value &&
+    activeSortBy.value === wootConstants.SORT_BY_TYPE.LAST_MESSAGE_DESC
+  ) {
+    localConversationList = [...localConversationList].sort((a, b) =>
+      sortComparator(a, b, wootConstants.SORT_BY_TYPE.LAST_MESSAGE_DESC)
+    );
   }
 
   return localConversationList;

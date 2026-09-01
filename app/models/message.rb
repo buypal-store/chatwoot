@@ -135,8 +135,8 @@ class Message < ApplicationRecord
   has_one :csat_survey_response, dependent: :destroy_async
   has_many :notifications, as: :primary_actor, dependent: :destroy_async
 
-  after_create_commit :execute_after_create_commit_callbacks
   after_create_commit :set_conversation_last_message_at
+  after_create_commit :execute_after_create_commit_callbacks
 
   after_update_commit :dispatch_update_event
   after_commit :reindex_for_search, if: :should_index?, on: [:create, :update]
@@ -162,6 +162,7 @@ class Message < ApplicationRecord
       assignee_id: conversation.assignee_id,
       unread_count: conversation.unread_incoming_messages.count,
       last_activity_at: conversation.last_activity_at.to_i,
+      last_message_at: ((incoming? || outgoing?) && !private? ? created_at : conversation.last_message_at).to_i,
       contact_inbox: { source_id: conversation.contact_inbox.source_id }
     }
   end

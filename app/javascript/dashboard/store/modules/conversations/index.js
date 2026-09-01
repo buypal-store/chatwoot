@@ -222,8 +222,16 @@ export const mutations = {
     } else {
       chat.messages.push(message);
       chat.timestamp = message.created_at;
-      const { conversation: { unread_count: unreadCount = 0 } = {} } = message;
+      const {
+        conversation: {
+          unread_count: unreadCount = 0,
+          last_activity_at: lastActivityAt,
+          last_message_at: lastMessageAt,
+        } = {},
+      } = message;
       chat.unread_count = unreadCount;
+      if (lastActivityAt) chat.last_activity_at = lastActivityAt;
+      if (lastMessageAt) chat.last_message_at = lastMessageAt;
       if (selectedChatId === conversationId) {
         emitter.emit(BUS_EVENTS.SCROLL_TO_MESSAGE);
       }

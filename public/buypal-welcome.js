@@ -32,6 +32,7 @@
     campo:       'agente',
     base:        'created_at',         // created_at = cuándo se vendió · fecha = fecha del pedido
     vendedores:  ['Wendy', 'Cesar', 'Gian', 'Mesias'],
+    sinPerrito:  ['Wendy'],            // (09/10) sin bienvenida, sin perrito y sin sonido; sigue en el ranking
   };
 
   /* ================== CSS (se inyecta solo) ================== */
@@ -148,6 +149,7 @@
 
   /* ================== ESTADO ================== */
   var AGENTE = '';
+  var SIN_PERRITO = false;
   var diasAtras = 0;   
   var timers = [], gifURL = '';
   var blobEsVideo = false;
@@ -474,8 +476,8 @@
     panel.id = 'wg-panel';
     panel.setAttribute('role', 'dialog');
     panel.setAttribute('aria-label', 'Mensaje del día');
-            var mediaTag = media(gifURL, false);
-    if (esVideo(gifURL)) {
+            var mediaTag = SIN_PERRITO ? '' : media(gifURL, false);
+    if (!SIN_PERRITO && esVideo(gifURL)) {
       mediaTag = '<video class="wg-perrito-lateral" src="' + gifURL + '" autoplay muted loop playsinline disablepictureinpicture></video>';
     }
     panel.innerHTML = '<button class="wg-cerrar" type="button" aria-label="Cerrar">✕</button>' +
@@ -883,7 +885,8 @@
         var animado = (CONFIG.animar || CONFIG.vendedores || []).some(function (v) {
           return normal(v) === yoP;
         });
-        if (!animado || yaVisto()) {
+        SIN_PERRITO = (CONFIG.sinPerrito || []).some(function (v) { return normal(v) === yoP; });
+        if (!animado || SIN_PERRITO || yaVisto()) {
           soloTab();
         } else {
           marcarVisto();
@@ -895,6 +898,7 @@
       /* ================== API PÚBLICA ================== */
   window.BuyPalWelcome = {
     celebrar: function (opciones) {
+      if (SIN_PERRITO) return;
       opciones = opciones || {};
 
       /* limpia solo lo de la animación anterior — la pestaña se queda */

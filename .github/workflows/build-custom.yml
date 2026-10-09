@@ -1,10 +1,17 @@
+# Reemplaza .github/workflows/build-custom.yml del repo buypal-store/chatwoot.
+# Construye una versión de PRUEBA con etiqueta propia; NUNCA toca update-4.17.1-v4 (la de producción).
+# Etiquetas: sha-<7 caracteres del commit> y rama-<rama>. Para probarla en el servidor:
+#   sudo /opt/chatwoot-pruebas/pruebas.sh traer sha-xxxxxxx
 name: Build Custom Chatwoot Image
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - develop
+    branches: ['**']
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -15,6 +22,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Etiquetas
+        id: tags
+        run: |
+          RAMA=$(echo "${GITHUB_REF_NAME}" | tr '/' '-' | tr -cd 'A-Za-z0-9._-' | cut -c1-60)
+          echo "corto=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          echo "rama=$RAMA" >> "$GITHUB_OUTPUT"
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -29,9 +43,16 @@ jobs:
           context: .
           file: docker/Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository }}:update-4.17.1-v4
+          tags: |
+            ghcr.io/${{ github.repository }}:sha-${{ steps.tags.outputs.corto }}
+            ghcr.io/${{ github.repository }}:rama-${{ steps.tags.outputs.rama }}
           build-args: |
             VITE_INFORME_ASESORES_URL=${{ vars.VITE_INFORME_ASESORES_URL }}
             VITE_INFORME_ASESORES_TOKEN=${{ secrets.VITE_INFORME_ASESORES_TOKEN }}
             VITE_ALERTAS_URL=${{ vars.VITE_ALERTAS_URL }}
             VITE_ALERTAS_TOKEN=${{ secrets.VITE_ALERTAS_TOKEN }}
+
+      - name: Resumen
+        run: |
+          echo "### Imagen lista: \`sha-${{ steps.tags.outputs.corto }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Probar: \`sudo /opt/chatwoot-pruebas/pruebas.sh traer sha-${{ steps.tags.outputs.corto }}\`" >> "$GITHUB_STEP_SUMMARY"

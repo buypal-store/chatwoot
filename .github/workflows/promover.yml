@@ -1,0 +1,42 @@
+# Va en .github/workflows/promover.yml del repo buypal-store/chatwoot.
+# Hace que la etiqueta de producción (update-4.17.1-v4, la que descarga Coolify) apunte a una versión ya probada.
+# Se corre JUNTO con `sudo /opt/chatwoot-pruebas/produccion.sh promover <tag>` en el servidor (que es el que reinicia
+# Chatwoot y guarda la vuelta atrás). Si no se corre, un "Redeploy" desde Coolify volvería a bajar la versión anterior.
+# No reconstruye nada: solo re-etiqueta (segundos). También deja una copia fechada prod-AAAAMMDD-HHMM.
+name: Promover a producción
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Etiqueta ya probada en pruebas (ej. sha-abc1234)'
+        required: true
+
+jobs:
+  promover:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - name: Validar etiqueta
+        env:
+          TAG: ${{ inputs.tag }}
+        run: '[[ "$TAG" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$ ]] || { echo "Etiqueta inválida"; exit 1; }'
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Re-etiquetar
+        env:
+          TAG: ${{ inputs.tag }}
+          REPO: ghcr.io/${{ github.repository }}
+        run: |
+          FECHA=$(TZ=America/Lima date +%Y%m%d-%H%M)
+          docker buildx imagetools create -t "$REPO:update-4.17.1-v4" -t "$REPO:prod-$FECHA" "$REPO:$TAG"
+          echo "### update-4.17.1-v4 → $TAG (copia: prod-$FECHA)" >> "$GITHUB_STEP_SUMMARY"

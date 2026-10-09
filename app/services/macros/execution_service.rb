@@ -7,7 +7,7 @@ class Macros::ExecutionService < ActionService
     Current.user = user
   end
 
-  # BuyPal: en WhatsApp, una foto o video seguido de un texto sale como UN solo mensaje (el texto va de pie de foto).
+  # BuyPal: en WhatsApp, una foto o video junto a un texto (antes o después) sale como UN solo mensaje (pie de foto).
   WHATSAPP_CAPTION_LIMIT = 1024
 
   def perform
@@ -16,11 +16,10 @@ class Macros::ExecutionService < ActionService
     while index < actions.size
       action = actions[index]
       begin
-        caption_action = caption_for(action, actions[index + 1])
-        if caption_action
+        media, caption = media_with_caption(action, actions[index + 1])
+        if media
           index += 1
-          caption = caption_action[:action_params][0]
-          send_attachment(action[:action_params], caption) || send_message([caption])
+          send_attachment(media[:action_params], caption) || send_message([caption])
         else
           send(action[:action_name], action[:action_params])
         end
@@ -60,12 +59,18 @@ class Macros::ExecutionService < ActionService
     mb.perform
   end
 
-  def caption_for(action, next_action)
-    return unless action[:action_name] == 'send_attachment' && next_action&.dig(:action_name) == 'send_message'
-    return unless Array(action[:action_params]).size == 1 && @conversation.inbox&.channel_type == 'Channel::Whatsapp'
+  # Devuelve [acción de foto/video, texto] si las dos acciones se pueden juntar (en cualquier orden).
+  def media_with_caption(action, next_action)
+    return unless next_action && @conversation.inbox&.channel_type == 'Channel::Whatsapp'
 
-    caption = next_action[:action_params]&.first
-    next_action if caption.present? && caption.length <= WHATSAPP_CAPTION_LIMIT
+    names = [action[:action_name], next_action[:action_name]]
+    return unless names.sort == %w[send_attachment send_message]
+
+    media, text = action[:action_name] == 'send_attachment' ? [action, next_action] : [next_action, action]
+    return unless Array(media[:action_params]).size == 1
+
+    caption = text[:action_params]&.first
+    [media, caption] if caption.present? && caption.length <= WHATSAPP_CAPTION_LIMIT
   end
 
   def send_attachment(blob_ids, caption = nil)

@@ -169,6 +169,30 @@ RSpec.describe Macros::ExecutionService, type: :service do
     end
   end
 
+  describe 'attachment followed by a message' do
+    before do
+      macro.files.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'avatar.png', content_type: 'image/png')
+      macro.save!
+      allow(service).to receive(:conversation_a_tweet?).and_return(false)
+      allow(macro).to receive(:actions).and_return([
+                                                     { action_name: 'send_attachment', action_params: [macro.files.first.blob_id] },
+                                                     { action_name: 'send_message', action_params: ['Precio S/ 99'] }
+                                                   ])
+    end
+
+    it 'sends one message with the text as caption on WhatsApp' do
+      allow(conversation.inbox).to receive(:channel_type).and_return('Channel::Whatsapp')
+
+      expect { service.perform }.to change(Message, :count).by(1)
+      expect(Message.last.content).to eq('Precio S/ 99')
+      expect(Message.last.attachments).to be_present
+    end
+
+    it 'keeps two messages on other channels' do
+      expect { service.perform }.to change(Message, :count).by(2)
+    end
+  end
+
   describe '#send_webhook_event' do
     it 'sends a webhook event' do
       expect(WebhookJob).to receive(:perform_later)

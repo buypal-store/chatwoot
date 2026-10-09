@@ -7,14 +7,27 @@ class Macros::ExecutionService < ActionService
     Current.user = user
   end
 
+  # BuyPal: en WhatsApp, una foto o video seguido de un texto sale como UN solo mensaje (el texto va de pie de foto).
+  WHATSAPP_CAPTION_LIMIT = 1024
+
   def perform
-    @macro.actions.each do |action|
-      action = action.with_indifferent_access
+    actions = @macro.actions.map(&:with_indifferent_access)
+    index = 0
+    while index < actions.size
+      action = actions[index]
       begin
-        send(action[:action_name], action[:action_params])
+        caption_action = caption_for(action, actions[index + 1])
+        if caption_action
+          index += 1
+          caption = caption_action[:action_params][0]
+          send_attachment(action[:action_params], caption) || send_message([caption])
+        else
+          send(action[:action_name], action[:action_params])
+        end
       rescue StandardError => e
         ChatwootExceptionTracker.new(e, account: @account).capture_exception
       end
+      index += 1
     end
   ensure
     Current.reset
@@ -47,7 +60,15 @@ class Macros::ExecutionService < ActionService
     mb.perform
   end
 
-  def send_attachment(blob_ids)
+  def caption_for(action, next_action)
+    return unless action[:action_name] == 'send_attachment' && next_action&.dig(:action_name) == 'send_message'
+    return unless Array(action[:action_params]).size == 1 && @conversation.inbox&.channel_type == 'Channel::Whatsapp'
+
+    caption = next_action[:action_params]&.first
+    next_action if caption.present? && caption.length <= WHATSAPP_CAPTION_LIMIT
+  end
+
+  def send_attachment(blob_ids, caption = nil)
     return if conversation_a_tweet?
 
     return unless @macro.files.attached?
@@ -56,7 +77,7 @@ class Macros::ExecutionService < ActionService
 
     return if blobs.blank?
 
-    params = { content: nil, private: false, attachments: blobs }
+    params = { content: caption, private: false, attachments: blobs }
 
     # Added reload here to ensure conversation us persistent with the latest updates
     mb = Messages::MessageBuilder.new(@user, @conversation.reload, params)

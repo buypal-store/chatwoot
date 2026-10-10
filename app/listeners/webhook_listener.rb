@@ -8,8 +8,6 @@ class WebhookListener < BaseListener
   end
 
   def conversation_updated(event)
-    return if only_order_status_changed?(event)
-
     conversation = extract_conversation_and_account(event)[0]
     changed_attributes = extract_changed_attributes(event)
     inbox = conversation.inbox
@@ -102,16 +100,6 @@ end
   end
 
   private
-
-  # BuyPal: el estado del pedido (custom_attributes.estado_pedido) solo se muestra en la lista de chats.
-  # Si es lo único que cambió, no se avisa a los webhooks (n8n, termómetro): cero carga extra para ellos.
-  def only_order_status_changed?(event)
-    changes = (event.data[:changed_attributes] || {}).to_h.except('updated_at', :updated_at)
-    return false unless changes.keys.map(&:to_s) == ['custom_attributes']
-
-    before, after = Array(changes.values.first).map { |attrs| (attrs || {}).to_h.except('estado_pedido', :estado_pedido) }
-    before == after
-  end
 
   def handle_typing_status(event_name, event)
     conversation = event.data[:conversation]

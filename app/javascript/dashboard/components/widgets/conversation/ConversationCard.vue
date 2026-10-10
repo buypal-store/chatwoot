@@ -70,27 +70,6 @@ const showLabelsSection = computed(() => {
   return props.chat.labels?.length > 0 || hasSlaPolicyId.value;
 });
 
-// BuyPal: estado del pedido. Viene en custom_attributes.estado_pedido, que ya llega con la lista
-// (no hace ninguna consulta extra). Ej.: "En ruta · 09/10".
-const ORDER_STATUS_STYLES = [
-  { key: 'subido', icon: 'i-lucide-package', class: 'bg-n-slate-3 text-n-slate-11' },
-  { key: 'preparado', icon: 'i-lucide-box', class: 'bg-n-iris-3 text-n-iris-11' },
-  { key: 'en ruta', icon: 'i-lucide-truck', class: 'bg-n-blue-3 text-n-blue-11' },
-  { key: 'despachado', icon: 'i-lucide-truck', class: 'bg-n-blue-3 text-n-blue-11' },
-  { key: 'reprogramado', icon: 'i-lucide-clock', class: 'bg-n-amber-3 text-n-amber-11' },
-  { key: 'entregado', icon: 'i-lucide-check', class: 'bg-n-teal-3 text-n-teal-11' },
-  { key: 'cancelado', icon: 'i-lucide-x', class: 'bg-n-ruby-3 text-n-ruby-11' },
-];
-
-const orderStatus = computed(() => {
-  const text = props.chat.custom_attributes?.estado_pedido;
-  if (!text || typeof text !== 'string') return null;
-  const lower = text.toLowerCase();
-  const style = ORDER_STATUS_STYLES.find(({ key }) => lower.startsWith(key)) ||
-    ORDER_STATUS_STYLES[0];
-  return { text, icon: style.icon, class: style.class };
-});
-
 const messagePreviewClass = computed(() => {
   return [
     hasUnread.value ? 'font-medium text-n-slate-12' : 'text-n-slate-11',
@@ -262,14 +241,6 @@ watch(
           <SLACardLabel :chat="chat" class="ltr:mr-1 rtl:ml-1" />
         </template>
       </CardLabels>
-      <span
-        v-if="orderStatus"
-        class="inline-flex items-center gap-1 mt-1 mx-2 px-1.5 py-0.5 rounded-md text-xs font-medium"
-        :class="orderStatus.class"
-      >
-        <Icon :icon="orderStatus.icon" class="size-3 flex-shrink-0" />
-        {{ orderStatus.text }}
-      </span>
     </div>
   </div>
 </template>

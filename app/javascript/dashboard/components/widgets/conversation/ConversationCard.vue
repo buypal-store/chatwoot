@@ -76,6 +76,7 @@ const ORDER_STATUS_STYLES = [
   { key: 'subido', icon: 'i-lucide-package', class: 'bg-n-slate-3 text-n-slate-11' },
   { key: 'preparado', icon: 'i-lucide-box', class: 'bg-n-iris-3 text-n-iris-11' },
   { key: 'en ruta', icon: 'i-lucide-truck', class: 'bg-n-blue-3 text-n-blue-11' },
+  { key: 'despachado', icon: 'i-lucide-truck', class: 'bg-n-blue-3 text-n-blue-11' },
   { key: 'reprogramado', icon: 'i-lucide-clock', class: 'bg-n-amber-3 text-n-amber-11' },
   { key: 'entregado', icon: 'i-lucide-check', class: 'bg-n-teal-3 text-n-teal-11' },
   { key: 'cancelado', icon: 'i-lucide-x', class: 'bg-n-ruby-3 text-n-ruby-11' },

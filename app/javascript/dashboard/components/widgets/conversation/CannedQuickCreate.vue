@@ -61,6 +61,13 @@ const onConfirm = async () => {
     error.value = 'Escribe el atajo y el texto.';
     return;
   }
+  const exists = store.getters.getCannedResponses.some(
+    item => item.short_code === normalizedShortCode.value
+  );
+  if (exists) {
+    error.value = `Ya existe /${normalizedShortCode.value}. Usa otro atajo.`;
+    return;
+  }
   const formData = new FormData();
   formData.append('canned_response[short_code]', normalizedShortCode.value);
   formData.append('canned_response[content]', content.value);
@@ -72,10 +79,31 @@ const onConfirm = async () => {
     dialogRef.value?.close();
     emit('created', created);
   } catch (e) {
-    error.value = e?.message || 'No se pudo guardar. ¿Ya existe ese atajo?';
+    // Si la subida de la imagen fue lenta, el servidor puede cortar la respuesta aunque ya guardó.
+    // Se revisa una sola vez: si el atajo quedó guardado, se usa como si nada.
+    const saved = await findSaved(normalizedShortCode.value);
+    if (saved) {
+      dialogRef.value?.close();
+      emit('created', saved);
+    } else {
+      error.value =
+        'No se pudo guardar. Revisa tu internet o prueba con una imagen más liviana.';
+    }
   } finally {
     isSaving.value = false;
   }
+};
+
+const findSaved = async code => {
+  try {
+    await store.dispatch('getCannedResponse');
+  } catch {
+    return null;
+  }
+  return (
+    store.getters.getCannedResponses.find(item => item.short_code === code) ||
+    null
+  );
 };
 
 defineExpose({ open });

@@ -265,6 +265,24 @@ export default {
     ActiveStorage.start();
   },
   methods: {
+    // BuyPal: botón para bajar de línea sin enviar (igual que Shift + Enter); Enter sigue enviando.
+    insertLineBreak() {
+      const replyBox = this.$el?.closest('.reply-box') || document;
+      const editor = replyBox.querySelector('.ProseMirror');
+      if (!editor) return;
+      editor.focus();
+      editor.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Enter',
+          code: 'Enter',
+          keyCode: 13,
+          which: 13,
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        })
+      );
+    },
     toggleMessageSignature() {
       this.setSignatureFlagForInbox(this.channelType, !this.sendWithSignature);
     },
@@ -286,6 +304,16 @@ export default {
         faded
         sm
         @click="toggleEmojiPicker"
+      />
+      <NextButton
+        v-if="!isEditorDisabled"
+        v-tooltip.top-end="'Bajar de línea (no envía)'"
+        icon="i-ph-arrow-elbow-down-left"
+        slate
+        faded
+        sm
+        @mousedown.prevent
+        @click="insertLineBreak"
       />
       <FileUpload
         v-if="showAttachButton"

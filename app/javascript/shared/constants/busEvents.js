@@ -14,4 +14,7 @@ export const BUS_EVENTS = {
   INSERT_INTO_RICH_EDITOR: 'insertIntoRichEditor',
   INSERT_INTO_NORMAL_EDITOR: 'insertIntoNormalEditor',
   MFA_STATE_CHANGED: 'MFA_STATE_CHANGED',
+  // BuyPal: respuestas rápidas con imagen
+  ATTACH_CANNED_IMAGE: 'attachCannedImage',
+  OPEN_CANNED_QUICK_CREATE: 'openCannedQuickCreate',
 };

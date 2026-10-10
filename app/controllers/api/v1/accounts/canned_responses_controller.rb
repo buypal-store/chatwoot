@@ -12,6 +12,7 @@ class Api::V1::Accounts::CannedResponsesController < Api::V1::Accounts::BaseCont
   end
 
   def update
+    @canned_response.image.purge if params.dig(:canned_response, :remove_image).to_s == 'true'
     @canned_response.update!(canned_response_params)
     render json: @canned_response
   end
@@ -28,18 +29,19 @@ class Api::V1::Accounts::CannedResponsesController < Api::V1::Accounts::BaseCont
   end
 
   def canned_response_params
-    params.require(:canned_response).permit(:short_code, :content)
+    params.require(:canned_response).permit(:short_code, :content, :image)
   end
 
+  # BuyPal: with_attached_image trae las imágenes en la misma tanda de consultas (sin una consulta por respuesta).
   def canned_responses
     if params[:search]
       search = params[:search].delete("\0")
-      Current.account.canned_responses
+      Current.account.canned_responses.with_attached_image
              .where('short_code ILIKE :search OR content ILIKE :search', search: "%#{search}%")
              .order_by_search(search)
 
     else
-      Current.account.canned_responses
+      Current.account.canned_responses.with_attached_image
     end
   end
 end

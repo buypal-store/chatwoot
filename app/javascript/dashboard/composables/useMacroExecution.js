@@ -4,6 +4,10 @@ import { useAlert, useTrack } from 'dashboard/composables';
 import { useStore, useMapGetter } from 'dashboard/composables/store';
 import { useConversationRequiredAttributes } from 'dashboard/composables/useConversationRequiredAttributes';
 import { CONVERSATION_EVENTS } from 'dashboard/helper/AnalyticsHelper/events';
+import {
+  findSentDuplicate,
+  confirmResend,
+} from 'dashboard/helper/duplicateMessage';
 
 // change_status is not offered by the macro builder, but the API accepts it and
 // it resolves the conversation just like resolve_conversation does. Its param is
@@ -60,8 +64,22 @@ export function useMacroExecution() {
     }
   };
 
+  // BuyPal: si un texto de la macro ya se envió en este chat, pide confirmación.
+  const isRepeatedAndCancelled = (macro, conversationId) => {
+    const messages = conversationById.value(conversationId)?.messages;
+    const duplicate = macro.actions
+      .filter(({ action_name: name }) => name === 'send_message')
+      .map(({ action_params: params }) =>
+        findSentDuplicate(messages, params?.[0])
+      )
+      .find(Boolean);
+    return Boolean(duplicate) && !confirmResend(duplicate);
+  };
+
   const execute = (macro, conversationId) => {
     const execution = { macro, conversationId };
+
+    if (isRepeatedAndCancelled(macro, conversationId)) return null;
 
     if (!resolvesConversation(macro)) {
       runMacro(execution);

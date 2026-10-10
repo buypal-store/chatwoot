@@ -61,6 +61,11 @@ import { LOCAL_STORAGE_KEYS } from 'dashboard/constants/localStorage';
 import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 import { LocalStorage } from 'shared/helpers/localStorage';
 import { emitter } from 'shared/helpers/mitt';
+import CannedQuickCreate from './CannedQuickCreate.vue';
+import {
+  findSentDuplicate,
+  confirmResend,
+} from 'dashboard/helper/duplicateMessage';
 const EmojiIconPicker = defineAsyncComponent(
   () =>
     import('dashboard/components-next/emoji-icon-picker/EmojiIconPicker.vue')
@@ -71,6 +76,7 @@ export default {
     ArticleSearchPopover,
     AttachmentPreview,
     AudioRecorder,
+    CannedQuickCreate,
     ReplyBoxBanner,
     EmojiIconPicker,
     MessageSignatureMissingAlert,
@@ -594,6 +600,8 @@ export default {
     );
     emitter.on(BUS_EVENTS.INSERT_INTO_NORMAL_EDITOR, this.addIntoEditor);
     emitter.on(CMD_AI_ASSIST, this.executeCopilotAction);
+    emitter.on(BUS_EVENTS.ATTACH_CANNED_IMAGE, this.attachCannedImage);
+    emitter.on(BUS_EVENTS.OPEN_CANNED_QUICK_CREATE, this.openCannedQuickCreate);
   },
   unmounted() {
     document.removeEventListener('paste', this.onPaste);
@@ -605,6 +613,11 @@ export default {
       this.onNewConversationModalActive
     );
     emitter.off(CMD_AI_ASSIST, this.executeCopilotAction);
+    emitter.off(BUS_EVENTS.ATTACH_CANNED_IMAGE, this.attachCannedImage);
+    emitter.off(
+      BUS_EVENTS.OPEN_CANNED_QUICK_CREATE,
+      this.openCannedQuickCreate
+    );
   },
   methods: {
     getDraftKey(
@@ -865,6 +878,13 @@ export default {
     confirmOnSendReply() {
       if (this.isReplyButtonDisabled) {
         return;
+      }
+      if (!this.isPrivate) {
+        const duplicate = findSentDuplicate(
+          this.currentChat.messages,
+          this.message
+        );
+        if (duplicate && !confirmResend(duplicate)) return;
       }
       if (!this.showMentions) {
         const copilotAcceptedMessage = this.getCopilotAcceptedMessage();
@@ -1147,6 +1167,40 @@ export default {
         });
       };
     },
+    // BuyPal: la imagen de una respuesta rápida se adjunta reusando su archivo (no se vuelve a subir).
+    attachCannedImage(image) {
+      if (!image?.signed_id) return;
+      if (!this.showFileUpload && !this.isOnPrivateNote) return;
+      if (this.attachedFiles.some(file => file.blobSignedId === image.signed_id))
+        return;
+
+      this.attachedFiles.push({
+        currentChatId: this.currentChat.id,
+        resource: {
+          filename: image.filename,
+          content_type: image.content_type,
+          byte_size: image.byte_size,
+        },
+        isPrivate: this.isPrivate,
+        thumb: image.url,
+        blobSignedId: image.signed_id,
+        isVoiceMessage: false,
+        fromCanned: true,
+      });
+    },
+    openCannedQuickCreate(prefill) {
+      this.$refs.cannedQuickCreate?.open(prefill);
+    },
+    onCannedCreated(cannedResponse) {
+      if (!cannedResponse) return;
+      emitter.emit(BUS_EVENTS.INSERT_INTO_RICH_EDITOR, cannedResponse.content);
+      this.attachCannedImage(cannedResponse.image);
+    },
+    attachmentForPayload(attachment) {
+      return this.globalConfig.directUploadsEnabled || attachment.fromCanned
+        ? attachment.blobSignedId
+        : attachment.resource.file;
+    },
     removeAttachment(attachments) {
       this.attachedFiles = attachments;
     },
@@ -1170,9 +1224,7 @@ export default {
         let caption =
           this.isAnInstagramChannel || this.isATiktokChannel ? '' : message;
         this.attachedFiles.forEach(attachment => {
-          const attachedFile = this.globalConfig.directUploadsEnabled
-            ? attachment.blobSignedId
-            : attachment.resource.file;
+          const attachedFile = this.attachmentForPayload(attachment);
           let attachmentPayload = {
             conversationId: this.currentChat.id,
             files: [attachedFile],
@@ -1227,13 +1279,12 @@ export default {
       if (this.attachedFiles && this.attachedFiles.length) {
         messagePayload.files = [];
         this.attachedFiles.forEach(attachment => {
-          if (this.globalConfig.directUploadsEnabled) {
-            messagePayload.files.push(attachment.blobSignedId);
-            if (attachment.isVoiceMessage) {
-              messagePayload.isVoiceMessage = true;
-            }
-          } else {
-            messagePayload.files.push(attachment.resource.file);
+          messagePayload.files.push(this.attachmentForPayload(attachment));
+          if (
+            this.globalConfig.directUploadsEnabled &&
+            attachment.isVoiceMessage
+          ) {
+            messagePayload.isVoiceMessage = true;
           }
         });
       }
@@ -1531,6 +1582,8 @@ export default {
         @toggle-quoted-reply="toggleQuotedReply"
       />
     </Transition>
+
+    <CannedQuickCreate ref="cannedQuickCreate" @created="onCannedCreated" />
 
     <WhatsappTemplates
       :inbox-id="inbox.id"

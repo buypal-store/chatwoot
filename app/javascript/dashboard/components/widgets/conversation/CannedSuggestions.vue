@@ -22,9 +22,15 @@ const MAX_SUGGESTIONS = 3;
 const NOT_A_QUESTION =
   /\bme envi(?:[oó]|aron)(?=\W|$)|\ble envi[eé](?=\W|$)|\bya (?:le )?envi[eé](?=\W|$)|\bya pagu[eé](?=\W|$)|\bya yape[eé](?=\W|$)|mi pedido/i;
 const TOPICS = [
+  // Provincia / Shalom: la respuesta de costo (ej. /Costo-Shalom: "Shalom le cobra al recoger…").
   {
-    rx: /costo (?:de|del) env[ií]o|cu[aá]nto (?:es|cuesta|sale) (?:el )?env[ií]o|hacen env[ií]os|\benv[ií]an a\b|delivery|provincia|por shalom|llega a\b/i,
-    words: ['envio', 'delivery', 'provincia', 'shalom'],
+    rx: /costo (?:de|del) env[ií]o|cu[aá]nto (?:es|cuesta|sale|cobran) (?:el )?(?:env[ií]o|flete)|hacen env[ií]os|\benv[ií]an a\b|provincia|por shalom|llega a\b/i,
+    words: ['costo', 'shalom', 'provincia'],
+  },
+  // Lima: delivery a domicilio.
+  {
+    rx: /delivery|a domicilio|en lima|hasta mi casa/i,
+    words: ['pce', 'domicilio', 'hoy'],
   },
   {
     rx: /c[oó]mo (?:pago|le pago|se paga)|aceptan (?:yape|plin)|pagar con|n[uú]mero de cuenta|\bpor yape\b|\bpor plin\b/i,
@@ -57,12 +63,17 @@ const suggestions = computed(() => {
   const text = lastIncoming.value?.content || '';
   if (!text || NOT_A_QUESTION.test(text)) return [];
   const found = [];
+  // Las palabras de cada tema van en orden de preferencia (ej. primero "costo", luego "shalom").
   TOPICS.filter(topic => topic.rx.test(text)).forEach(topic => {
-    const match = cannedResponses.value.find(
-      item =>
-        !found.includes(item) &&
-        topic.words.some(word => item.short_code.toLowerCase().includes(word))
-    );
+    const match = topic.words
+      .map(word =>
+        cannedResponses.value.find(
+          item =>
+            !found.includes(item) &&
+            item.short_code.toLowerCase().includes(word)
+        )
+      )
+      .find(Boolean);
     if (match) found.push(match);
   });
   return found.slice(0, MAX_SUGGESTIONS);

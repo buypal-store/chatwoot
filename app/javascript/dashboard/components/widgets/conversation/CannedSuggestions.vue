@@ -24,7 +24,7 @@ const NOT_A_QUESTION =
 const TOPICS = [
   // Provincia / Shalom: la respuesta de costo (ej. /Costo-Shalom: "Shalom le cobra al recoger…").
   {
-    rx: /costo (?:de|del) env[ií]o|cu[aá]nto (?:es|cuesta|sale|cobran) (?:el )?(?:env[ií]o|flete)|hacen env[ií]os|\benv[ií]an a\b|provincia|por shalom|llega a\b/i,
+    rx: /costo (?:de|del) env[ií]o|cu[aá]nto (?:me |le |nos )?(?:es|cuesta|sale|cobran|ser[ií]a|costar[ií]a) (?:el )?(?:env[ií]o|flete|mandar|enviar|llevar)|hacen env[ií]os|\benv[ií]an a\b|\b(?:mandar|enviar|llevar|despachar)(?:lo|la|los|las|me)? (?:a|hasta|para)\b|provincia|por shalom|llega a\b|\b(?:a|para|hasta|soy de|estoy en|vivo en) (?:arequipa|cusco|cuzco|trujillo|piura|chiclayo|iquitos|huancayo|tacna|puno|juliaca|ica|chimbote|ayacucho|cajamarca|tarapoto|pucallpa|huaraz|tumbes|moquegua|abancay|hu[aá]nuco|puerto maldonado)\b/i,
     words: ['costo', 'shalom', 'provincia'],
   },
   // Lima: delivery a domicilio.
@@ -37,7 +37,8 @@ const TOPICS = [
     words: ['qr', 'pago', 'yape', 'cuenta'],
   },
   {
-    rx: /\bprecio\b|cu[aá]nto (?:cuesta|est[aá]|vale|sale)|a cu[aá]nto|qu[eé] precio/i,
+    // (si pregunta cuánto cuesta MANDARLO, es envío, no precio)
+    rx: /\bprecio\b(?! (?:del|de) (?:env[ií]o|flete))|cu[aá]nto (?:me |le )?(?:cuesta|est[aá]|vale|sale)(?! (?:el )?(?:env[ií]o|flete|mand|envi|llev))|a cu[aá]nto|qu[eé] precio/i,
     words: ['precio'],
   },
   {

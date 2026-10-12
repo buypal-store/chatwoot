@@ -982,8 +982,8 @@ export default {
       const opened = openClaude(buildHelpPrompt({ ...this.claudeContext(), request }));
       if (!opened) return;
       if (request) this.clearMessage();
-      await this.notifyClaude('claude', `🤖 ${this.claudeContext().agent} pidió ayuda a Claude para responder.`);
-      useAlert('Se abrió tu Claude con la consulta lista: aprieta Enter.');
+      await this.notifyClaude('claude', `🤖 ${this.claudeContext().agent} mandó este chat a Claude para responder todo.`);
+      useAlert('Se abrió tu Claude con el chat listo: aprieta Enter.');
     },
     async orderWithClaude() {
       const opened = openClaude(buildOrderPrompt(this.claudeContext()));
@@ -1614,7 +1614,7 @@ export default {
             @click="askClaude"
           >
             <span class="i-lucide-message-circle size-4" />
-            Ayúdame a responder
+            Responder todo con Claude
           </button>
           <button
             type="button"

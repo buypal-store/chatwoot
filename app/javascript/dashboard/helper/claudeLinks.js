@@ -56,10 +56,23 @@ Después de subir: revisa que entró UNA sola vez CON fecha y número (si no, re
 ${RULES}`;
 };
 
-export const buildHelpPrompt = ({ phone, chatId, inbox, agent, request }) =>
-  `${agent} pide ayuda para responder en Chatwoot.
+export const buildHelpPrompt = ({ phone, chatId, inbox, agent, request }) => {
+  const trial = today() <= TRIAL_UNTIL;
+  const approval = trial
+    ? `SEMANA DE PRUEBA (hasta el ${TRIAL_UNTIL}): muéstrame la respuesta y espera mi sí antes de enviarla.`
+    : 'Apretar el botón YA ES MI SÍ: si todo es información general, envíala directo. Si hay algo delicado (abajo), envía igual lo general y avísame lo delicado.';
+  return `${agent} apretó "Responder todo con Claude" en Chatwoot.
 Cliente: ${phone || '(sin número)'} · chat #${chatId} · bandeja ${inbox}.
-${request ? `Indicación: ${request}\n` : ''}Lee el chat y propón la respuesta (corta, amable, con su nombre). NO la envíes: muéstramela y espera mi sí. No inventes precios, claves ni acuerdos.`;
+${request ? `Indicación del asesor: ${request}\n` : ''}OBJETIVO: contestar TODAS las preguntas pendientes del cliente en UN SOLO mensaje (1 burbuja), para ahorrar tiempo y mensajes.
+1. Lee todos los mensajes del cliente desde la última respuesta del equipo y lista cada pregunta.
+2. Busca cada dato en su fuente: precio y stock en la ficha / tomador, envío y pago con las reglas de BuyPal (Lima contra entrega, envío gratis desde S/ 79; provincia por Shalom con adelanto de S/ 50 y flete que se paga al recoger), y las respuestas rápidas o macros que ya existen. No inventes nada; si un dato no lo encuentras, no lo pongas y avísame.
+3. Escribe UN mensaje ordenado: saludo con su nombre ("mamita" en BabyPal), una línea con emoji por cada respuesta, y al final una pregunta de cierre que avance la venta (¿te lo separo? / ¿a qué distrito te lo enviamos?). Si hace falta una foto, solo una, con todo el texto debajo.
+4. LO DELICADO NO SE CONTESTA: acuerdos (guardar sin adelanto, cambiar horarios), descuentos o precios especiales, y reclamos. En el mensaje al cliente pon solo una frase que no comprometa ("sobre eso déjame consultarlo y te confirmo en un ratito 😊") y a mí avísame aparte: "⚠️ pidió X, eso lo decides tú".
+5. Si el cliente ya quiere comprar, dímelo para usar "Subir con Claude".
+6. Si el pedido ya está cerrado o subido, no respondas: avísame.
+${approval}
+Reglas de oro: no inventes precios, claves, guías ni pedidos; nunca ofrezcas descuentos ni acuerdos; cuida el servidor (una consulta a la vez).`;
+};
 
 export const openClaude = prompt => {
   const folder = getClaudeFolder() || askClaudeFolder();

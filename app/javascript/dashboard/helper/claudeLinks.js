@@ -14,6 +14,7 @@ const RULES = `## Criterios (los mismos del chat "Subir pedidos")
 5. LA FECHA (hora de Lima) ES OBLIGATORIA: lunes a viernes después de 4:30 pm → mañana; sábado corte 1 pm; domingo no hay reparto. Antes de subir confirma que el campo FECHA del formulario muestra la fecha correcta; si está vacío o no se ve, NO subas.
 6. NO SUBIR DOBLE: justo antes de subir busca en la base por celular y DNI de los últimos 15 días (incluidos los pedidos SIN fecha); si existe, NO subas y avisa.
 7. AGENTE: el pedido va a nombre del vendedor asignado al chat.
+9. PLATAFORMA (TIKTOKER) OBLIGATORIA: sale de la etiqueta del live del chat: live-<nombre> → "<NOMBRE> - TKTOK" (ej. live-aixa → AIXA - TKTOK); si hay varias, la más reciente. Si no hay etiqueta de live o no encuentras el chat del cliente, NO adivines: pregúntale al asesor del chat qué tiktoker o plataforma va. En la captura debe verse la plataforma llena.
 8. VERIFICA: después de subir, el pedido debe tener fecha y número (AAAAMMDD-N). Si entró sin fecha o sin número, FALLÓ: NO lo vuelvas a subir; avísame con el celular del cliente.
 Reglas de oro: un pedido sin fecha o sin número es FALLIDO y nunca se vuelve a subir por tu cuenta; no inventes precios, claves, guías ni pedidos; nunca ofrezcas descuentos ni acuerdos nuevos; cuida el servidor (una consulta a la vez); si algo no cuadra, pregunta antes de actuar.`;
 

@@ -80,6 +80,15 @@ const suggestions = computed(() => {
   return found.slice(0, MAX_SUGGESTIONS);
 });
 
+// Ciudades donde el flete de Shalom cuesta mucho más que el monto de referencia (S/ 18): avisar al asesor.
+const EXPENSIVE_SHIPPING = /\biquitos\b/i;
+const shippingWarning = computed(() => {
+  const text = lastIncoming.value?.content || '';
+  return EXPENSIVE_SHIPPING.test(text)
+    ? '⚠️ Iquitos: el flete de Shalom es mucho más caro, no le digas S/ 18.'
+    : '';
+});
+
 const useSuggestion = item => {
   emitter.emit(BUS_EVENTS.INSERT_INTO_RICH_EDITOR, item.content);
   if (item.image) emitter.emit(BUS_EVENTS.ATTACH_CANNED_IMAGE, item.image);
@@ -91,6 +100,9 @@ onMounted(() => {
 </script>
 
 <template>
+  <p v-if="shippingWarning" class="mb-0 px-3 pt-2 text-xs font-medium text-n-amber-11">
+    {{ shippingWarning }}
+  </p>
   <div v-if="suggestions.length" class="flex flex-wrap items-center gap-1 px-3 pt-2">
     <span class="text-xs text-n-slate-10">Sugeridas:</span>
     <button

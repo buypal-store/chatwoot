@@ -111,12 +111,12 @@ const windowClock = computed(() => {
   if (!lastIncoming) return null;
   const left = lastIncoming.created_at + 24 * 3600 - nowInSeconds.value;
   if (left <= 0) {
-    return { text: 'ventana de 24 h cerrada', class: 'text-n-ruby-11' };
+    return { text: 'este chat ya se cerró (solo plantilla)', class: 'text-n-ruby-11' };
   }
   const hours = Math.floor(left / 3600);
   const minutes = Math.floor((left % 3600) / 60);
   return {
-    text: `quedan ${hours} h ${minutes} min para responder gratis`,
+    text: `quedan ${hours} h ${minutes} min para que se cierre este chat`,
     class: left < 3 * 3600 ? 'text-n-amber-11 font-medium' : 'text-n-teal-11',
   };
 });

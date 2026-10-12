@@ -11,15 +11,37 @@ const props = defineProps({
 });
 
 const MAX_SUGGESTIONS = 3;
+// Ejemplos que SÍ sugieren:
+//  envío:     "¿cuánto es el envío a Arequipa?", "¿hacen envíos a provincia?", "¿tienen delivery?", "¿envían a Trujillo?"
+//  pago:      "¿cómo pago?", "¿aceptan yape?", "¿me pasas el número de cuenta?", "¿puedo pagar con plin?"
+//  precio:    "precio", "¿cuánto cuesta?", "¿a cuánto está?", "¿qué precio tiene?"
+//  ubicación: "¿dónde están ubicados?", "¿tienen tienda?", "¿cuál es la dirección de la tienda?"
+//  garantía:  "no funciona", "¿tiene garantía?", "vino fallado"
+// Ejemplos que NO sugieren (el cliente cuenta algo, no pregunta): "me envió", "ya le envié el voucher",
+//  "me enviaron otro", "¿cuándo llega mi pedido?", "ya pagué", "ya yapeé".
+const NOT_A_QUESTION =
+  /\bme envi(?:[oó]|aron)(?=\W|$)|\ble envi[eé](?=\W|$)|\bya (?:le )?envi[eé](?=\W|$)|\bya pagu[eé](?=\W|$)|\bya yape[eé](?=\W|$)|mi pedido/i;
 const TOPICS = [
   {
-    rx: /env[ií]o|delivery|provincia|shalom|agencia|llega|distrito/i,
+    rx: /costo (?:de|del) env[ií]o|cu[aá]nto (?:es|cuesta|sale) (?:el )?env[ií]o|hacen env[ií]os|\benv[ií]an a\b|delivery|provincia|por shalom|llega a\b/i,
     words: ['envio', 'delivery', 'provincia', 'shalom'],
   },
-  { rx: /yape|plin|pago|pagar|cuenta|transfer/i, words: ['qr', 'pago', 'yape', 'cuenta'] },
-  { rx: /precio|cu[aá]nto|cuesta|costo|vale/i, words: ['precio'] },
-  { rx: /tienda|direcci[oó]n|ubicaci[oó]n|d[oó]nde est/i, words: ['ubicacion', 'tienda', 'direccion'] },
-  { rx: /garant[ií]a|falla|no funciona|devoluci/i, words: ['garantia', 'tyc'] },
+  {
+    rx: /c[oó]mo (?:pago|le pago|se paga)|aceptan (?:yape|plin)|pagar con|n[uú]mero de cuenta|\bpor yape\b|\bpor plin\b/i,
+    words: ['qr', 'pago', 'yape', 'cuenta'],
+  },
+  {
+    rx: /\bprecio\b|cu[aá]nto (?:cuesta|est[aá]|vale|sale)|a cu[aá]nto|qu[eé] precio/i,
+    words: ['precio'],
+  },
+  {
+    rx: /d[oó]nde (?:est[aá]n|quedan|se ubican)|ubicad[oa]s|tienen tienda|direcci[oó]n de la tienda/i,
+    words: ['ubicacion', 'tienda', 'direccion'],
+  },
+  {
+    rx: /no funciona|tiene garant[ií]a|vino fallad|est[aá] fallad|no prende/i,
+    words: ['garantia', 'tyc'],
+  },
 ];
 
 const store = useStore();
@@ -33,7 +55,7 @@ const lastIncoming = computed(() => {
 
 const suggestions = computed(() => {
   const text = lastIncoming.value?.content || '';
-  if (!text) return [];
+  if (!text || NOT_A_QUESTION.test(text)) return [];
   const found = [];
   TOPICS.filter(topic => topic.rx.test(text)).forEach(topic => {
     const match = cannedResponses.value.find(

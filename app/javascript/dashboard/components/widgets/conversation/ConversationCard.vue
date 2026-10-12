@@ -12,7 +12,6 @@ import UnreadBadge from 'dashboard/components-next/Conversation/ConversationCard
 import SLACardLabel from './components/SLACardLabel.vue';
 import VoiceCallStatus from './VoiceCallStatus.vue';
 import Checkbox from 'dashboard/components-next/checkbox/Checkbox.vue';
-import { useMinuteTicker } from 'dashboard/composables/useMinuteTicker';
 
 const props = defineProps({
   chat: { type: Object, required: true },
@@ -90,22 +89,6 @@ const orderStatus = computed(() => {
   const style = ORDER_STATUS_STYLES.find(({ key }) => lower.startsWith(key)) ||
     ORDER_STATUS_STYLES[0];
   return { text, icon: style.icon, class: style.class };
-});
-
-// BuyPal: reloj de espera. waiting_since ya viene con la lista; el minuto lo cuenta el navegador.
-const nowInSeconds = useMinuteTicker();
-const waitClock = computed(() => {
-  const since = Number(props.chat.waiting_since) || 0;
-  if (!since || props.chat.status !== 'open') return null;
-  const minutes = Math.max(0, Math.floor((nowInSeconds.value - since) / 60));
-  const text =
-    minutes < 60
-      ? `espera ${minutes} min`
-      : `espera ${Math.floor(minutes / 60)} h ${minutes % 60} min`;
-  let colorClass = 'bg-n-teal-3 text-n-teal-11';
-  if (minutes >= 30) colorClass = 'bg-n-ruby-3 text-n-ruby-11';
-  else if (minutes >= 5) colorClass = 'bg-n-amber-3 text-n-amber-11';
-  return { text, class: colorClass };
 });
 
 const messagePreviewClass = computed(() => {
@@ -279,15 +262,7 @@ watch(
           <SLACardLabel :chat="chat" class="ltr:mr-1 rtl:ml-1" />
         </template>
       </CardLabels>
-      <div v-if="waitClock || orderStatus" class="flex flex-wrap gap-1 mt-1 mx-2">
-        <span
-          v-if="waitClock"
-          class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-medium"
-          :class="waitClock.class"
-        >
-          <Icon icon="i-lucide-hourglass" class="size-3 flex-shrink-0" />
-          {{ waitClock.text }}
-        </span>
+      <div v-if="orderStatus" class="flex flex-wrap gap-1 mt-1 mx-2">
         <span
           v-if="orderStatus"
           class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-medium"

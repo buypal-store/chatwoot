@@ -937,6 +937,53 @@ export default {
         this.hideEmojiPicker();
       }
     },
+    // BuyPal: botones de Claude. Dejan una nota privada para Claude y una etiqueta para encontrar el chat.
+    // Al cliente no le llega nada. Claude responde con otra nota privada (o arma el pedido) y una persona decide.
+    async notifyClaude(label, note) {
+      const conversationId = this.currentChat.id;
+      try {
+        await this.$store.dispatch('createPendingMessageAndSend', {
+          conversationId,
+          message: note,
+          private: true,
+          sender: this.sender,
+        });
+        const labels = this.currentChat.labels || [];
+        if (!labels.includes(label)) {
+          await this.$store.dispatch('conversationLabels/update', {
+            conversationId,
+            labels: [...labels, label],
+          });
+        }
+        return true;
+      } catch (error) {
+        useAlert('No se pudo avisar a Claude. Intenta de nuevo.');
+        return false;
+      }
+    },
+    async askClaude() {
+      const request = (this.message || '').trim();
+      if (!request) {
+        useAlert('Escribe primero qué necesitas de Claude (ej.: ofrécele el combo con bolsas).');
+        return;
+      }
+      const ok = await this.notifyClaude('claude', `🤖 Para Claude: ${request}`);
+      if (ok) {
+        this.clearMessage();
+        useAlert('Listo: Claude te dejará la respuesta como nota privada.');
+      }
+    },
+    async orderWithClaude() {
+      const extra = (this.message || '').trim();
+      const ok = await this.notifyClaude(
+        'claude-pedido',
+        `🛍️ Para Claude: toma este pedido${extra ? ` (${extra})` : ''}. Valida el pago antes de subirlo.`
+      );
+      if (ok) {
+        if (extra) this.clearMessage();
+        useAlert('Listo: Claude armará el pedido y aparecerá en "Pedidos de Claude".');
+      }
+    },
     // BuyPal: juntar en 5 s. No aplica a respuestas citando un mensaje, con firma o con audio grabado.
     canBatchSend() {
       return (
@@ -1702,6 +1749,8 @@ export default {
         @select-content-template="openContentTemplateModal"
         @toggle-insert-article="toggleInsertArticle"
         @toggle-quoted-reply="toggleQuotedReply"
+        @ask-claude="askClaude"
+        @order-with-claude="orderWithClaude"
       />
     </Transition>
 

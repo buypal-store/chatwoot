@@ -121,32 +121,6 @@ const windowClock = computed(() => {
   };
 });
 
-// BuyPal: "Derivar a Claude" = etiqueta claude (Wendy le pide a Claude que revise esos chats; nada sale sin su OK).
-const CLAUDE_LABEL = 'claude';
-const isDerivedToClaude = computed(() =>
-  (props.chat.labels || []).includes(CLAUDE_LABEL)
-);
-const toggleClaude = async () => {
-  const labels = props.chat.labels || [];
-  const adding = !isDerivedToClaude.value;
-  const next = adding
-    ? [...labels, CLAUDE_LABEL]
-    : labels.filter(label => label !== CLAUDE_LABEL);
-  try {
-    await store.dispatch('conversationLabels/update', {
-      conversationId: props.chat.id,
-      labels: next,
-    });
-    useAlert(
-      adding
-        ? 'Derivado a Claude: revísalo desde Claude con "revisa los derivados".'
-        : 'Ya no está derivado a Claude.'
-    );
-  } catch (error) {
-    useAlert('No se pudo derivar. Intenta de nuevo.');
-  }
-};
-
 const copyConversationId = async () => {
   try {
     await copyTextToClipboard(String(props.chat.id));
@@ -239,18 +213,6 @@ const copyConversationId = async () => {
         @click="emitter.emit('toggle-pedido-panel', { conversationId: chat.id, inboxId: inbox.id })"
       >
         Tomar Pedido
-      </button>
-      <button
-        class="inline-flex items-center min-w-0 gap-1 transition-all duration-100 ease-out border-0 rounded-lg outline-1 outline h-8 px-3 text-sm justify-center"
-        :class="
-          isDerivedToClaude
-            ? 'bg-n-iris-3 text-n-iris-11 outline-n-iris-6'
-            : 'bg-n-button-color text-n-slate-12 outline-n-container hover:enabled:bg-n-alpha-2'
-        "
-        @click="toggleClaude"
-      >
-        <span class="i-lucide-sparkles size-4" />
-        {{ isDerivedToClaude ? 'Con Claude' : 'Derivar a Claude' }}
       </button>
       <MoreActions :conversation-id="currentChat.id" />
     </div>

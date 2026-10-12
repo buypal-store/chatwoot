@@ -32,6 +32,7 @@
     campo:       'agente',
     base:        'created_at',         // created_at = cuándo se vendió · fecha = fecha del pedido
     vendedores:  ['Wendy', 'Cesar', 'Gian', 'Mesias'],
+    sinPerrito:  ['Wendy'],            // (12/10) sin perrito; mensaje, ranking, sonido y confeti siguen igual
   };
 
   /* ================== CSS (se inyecta solo) ================== */
@@ -163,7 +164,13 @@
   };
 
   /* ================== PERRITO / MEDIA ================== */
+  function sinPerro() {
+    var yo = normal(AGENTE || '').split(' ')[0];
+    return !!yo && (CONFIG.sinPerrito || []).some(function (v) { return normal(v) === yo; });
+  }
+
   function perritoSVG(bailando, clase) {
+    if (sinPerro()) return '';
     return '<svg class="' + (clase || '') + (bailando ? ' wg-bailando' : '') + '" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Perrito">' +
       '<g class="wg-perro">' +
         '<ellipse cx="100" cy="178" rx="34" ry="6" fill="#c9dcf2"/>' +
@@ -189,6 +196,7 @@
   }
 
   function media(url, bailando, extra) {
+    if (sinPerro()) return '';
     var clase = 'wg-media ' + (extra || '');
     if (!url) return perritoSVG(bailando, clase);
     if (bailando) clase += ' wg-bailando';
@@ -475,7 +483,7 @@
     panel.setAttribute('role', 'dialog');
     panel.setAttribute('aria-label', 'Mensaje del día');
             var mediaTag = media(gifURL, false);
-    if (esVideo(gifURL)) {
+    if (esVideo(gifURL) && !sinPerro()) {
       mediaTag = '<video class="wg-perrito-lateral" src="' + gifURL + '" autoplay muted loop playsinline disablepictureinpicture></video>';
     }
     panel.innerHTML = '<button class="wg-cerrar" type="button" aria-label="Cerrar">✕</button>' +

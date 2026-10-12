@@ -193,6 +193,27 @@ RSpec.describe Macros::ExecutionService, type: :service do
     end
   end
 
+  describe 'several messages and one attachment' do
+    before do
+      macro.files.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'avatar.png', content_type: 'image/png')
+      macro.save!
+      allow(service).to receive(:conversation_a_tweet?).and_return(false)
+      allow(macro).to receive(:actions).and_return([
+                                                     { action_name: 'send_message', action_params: ['Envíos por Shalom'] },
+                                                     { action_name: 'send_attachment', action_params: [macro.files.first.blob_id] },
+                                                     { action_name: 'send_message', action_params: ['Envíanos tus datos'] }
+                                                   ])
+    end
+
+    it 'sends one message with all texts as caption on WhatsApp' do
+      allow(conversation.inbox).to receive(:channel_type).and_return('Channel::Whatsapp')
+
+      expect { service.perform }.to change(Message, :count).by(1)
+      expect(Message.last.content).to eq("Envíos por Shalom\n\nEnvíanos tus datos")
+      expect(Message.last.attachments).to be_present
+    end
+  end
+
   describe 'message followed by an attachment' do
     before do
       macro.files.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'avatar.png', content_type: 'image/png')

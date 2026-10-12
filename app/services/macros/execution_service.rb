@@ -11,13 +11,15 @@ class Macros::ExecutionService < ActionService
   WHATSAPP_CAPTION_LIMIT = 1024
 
   def perform
-    actions = @macro.actions.map(&:with_indifferent_access)
+    actions = combine_whatsapp_actions(@macro.actions.map(&:with_indifferent_access))
     index = 0
     while index < actions.size
       action = actions[index]
       begin
         media, caption = media_with_caption(action, actions[index + 1])
-        if media
+        if action[:caption].present?
+          send_attachment(action[:action_params], action[:caption]) || send_message([action[:caption]])
+        elsif media
           index += 1
           send_attachment(media[:action_params], caption) || send_message([caption])
         else
@@ -57,6 +59,28 @@ class Macros::ExecutionService < ActionService
     # Added reload here to ensure conversation us persistent with the latest updates
     mb = Messages::MessageBuilder.new(@user, @conversation.reload, params)
     mb.perform
+  end
+
+  # BuyPal (WhatsApp): todos los textos de la macro salen en UN mensaje.
+  # Con una sola foto/video, los textos van juntos como pie de foto (si caben en 1024 caracteres).
+  # Las demás acciones (etiquetas, asignar, etc.) se ejecutan igual y en su orden.
+  def combine_whatsapp_actions(actions)
+    return actions unless @conversation.inbox&.channel_type == 'Channel::Whatsapp'
+
+    texts = actions.select { |a| a[:action_name] == 'send_message' && a[:action_params]&.first.present? }
+    media = actions.select { |a| a[:action_name] == 'send_attachment' }
+    return actions if texts.size < 2 && media.size != 1
+
+    combined = texts.map { |a| a[:action_params].first.strip }.join("\n\n")
+    if media.size == 1 && Array(media.first[:action_params]).size == 1 && texts.any? && combined.length <= WHATSAPP_CAPTION_LIMIT
+      with_caption = actions.reject { |a| texts.include?(a) }
+      return with_caption.map { |a| a.equal?(media.first) ? a.merge(caption: combined) : a }
+    end
+    return actions if media.any? || texts.size < 2
+
+    first = texts.first
+    only_first = actions.reject { |a| texts.include?(a) && !a.equal?(first) }
+    only_first.map { |a| a.equal?(first) ? a.merge(action_params: [combined]) : a }
   end
 
   # Devuelve [acción de foto/video, texto] si las dos acciones se pueden juntar (en cualquier orden).

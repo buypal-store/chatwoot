@@ -19,6 +19,7 @@ import { useI18n } from 'vue-i18n';
 import { copyTextToClipboard } from 'shared/helpers/clipboard';
 import CardLabels from '../conversation/conversationCardComponents/CardLabels.vue';
 import AlertaTiktoker from './AlertaTiktoker.vue';
+import { useMinuteTicker } from 'dashboard/composables/useMinuteTicker';
 
 const props = defineProps({
   chat: {
@@ -100,6 +101,52 @@ const hasSlaPolicyId = computed(
   () => props.chat?.applied_sla?.id && !currentContact.value?.blocked
 );
 
+// BuyPal: reloj de la ventana de 24 h de WhatsApp (con los mensajes ya cargados; el navegador cuenta el minuto).
+const nowInSeconds = useMinuteTicker();
+const windowClock = computed(() => {
+  if (inbox.value?.channel_type !== 'Channel::Whatsapp') return null;
+  const lastIncoming = [...(currentChat.value?.messages || [])]
+    .reverse()
+    .find(message => message.message_type === 0);
+  if (!lastIncoming) return null;
+  const left = lastIncoming.created_at + 24 * 3600 - nowInSeconds.value;
+  if (left <= 0) {
+    return { text: 'ventana de 24 h cerrada', class: 'text-n-ruby-11' };
+  }
+  const hours = Math.floor(left / 3600);
+  const minutes = Math.floor((left % 3600) / 60);
+  return {
+    text: `quedan ${hours} h ${minutes} min para responder gratis`,
+    class: left < 3 * 3600 ? 'text-n-amber-11 font-medium' : 'text-n-teal-11',
+  };
+});
+
+// BuyPal: "Derivar a Claude" = etiqueta claude (Wendy le pide a Claude que revise esos chats; nada sale sin su OK).
+const CLAUDE_LABEL = 'claude';
+const isDerivedToClaude = computed(() =>
+  (props.chat.labels || []).includes(CLAUDE_LABEL)
+);
+const toggleClaude = async () => {
+  const labels = props.chat.labels || [];
+  const adding = !isDerivedToClaude.value;
+  const next = adding
+    ? [...labels, CLAUDE_LABEL]
+    : labels.filter(label => label !== CLAUDE_LABEL);
+  try {
+    await store.dispatch('conversationLabels/update', {
+      conversationId: props.chat.id,
+      labels: next,
+    });
+    useAlert(
+      adding
+        ? 'Derivado a Claude: revísalo desde Claude con "revisa los derivados".'
+        : 'Ya no está derivado a Claude.'
+    );
+  } catch (error) {
+    useAlert('No se pudo derivar. Intenta de nuevo.');
+  }
+};
+
 const copyConversationId = async () => {
   try {
     await copyTextToClipboard(String(props.chat.id));
@@ -162,6 +209,10 @@ const copyConversationId = async () => {
           <span v-if="isSnoozed" class="font-medium text-n-amber-10">
             {{ snoozedDisplayText }}
           </span>
+          <span v-if="windowClock">•</span>
+          <span v-if="windowClock" :class="windowClock.class">
+            {{ windowClock.text }}
+          </span>
         </div>
        <!-- Etiquetas (estilo nativo de Chatwoot) -->
         <CardLabels
@@ -188,6 +239,18 @@ const copyConversationId = async () => {
         @click="emitter.emit('toggle-pedido-panel', { conversationId: chat.id, inboxId: inbox.id })"
       >
         Tomar Pedido
+      </button>
+      <button
+        class="inline-flex items-center min-w-0 gap-1 transition-all duration-100 ease-out border-0 rounded-lg outline-1 outline h-8 px-3 text-sm justify-center"
+        :class="
+          isDerivedToClaude
+            ? 'bg-n-iris-3 text-n-iris-11 outline-n-iris-6'
+            : 'bg-n-button-color text-n-slate-12 outline-n-container hover:enabled:bg-n-alpha-2'
+        "
+        @click="toggleClaude"
+      >
+        <span class="i-lucide-sparkles size-4" />
+        {{ isDerivedToClaude ? 'Con Claude' : 'Derivar a Claude' }}
       </button>
       <MoreActions :conversation-id="currentChat.id" />
     </div>

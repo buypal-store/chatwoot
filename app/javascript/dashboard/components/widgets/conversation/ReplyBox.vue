@@ -62,6 +62,10 @@ import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 import { LocalStorage } from 'shared/helpers/localStorage';
 import { emitter } from 'shared/helpers/mitt';
 import CannedQuickCreate from './CannedQuickCreate.vue';
+import CannedSuggestions from './CannedSuggestions.vue';
+
+// BuyPal: lo que se envía seguido en WhatsApp espera unos segundos y sale junto en UN mensaje.
+const BATCH_SECONDS = 5;
 import {
   findSentDuplicate,
   confirmResend,
@@ -77,6 +81,7 @@ export default {
     AttachmentPreview,
     AudioRecorder,
     CannedQuickCreate,
+    CannedSuggestions,
     ReplyBoxBanner,
     EmojiIconPicker,
     MessageSignatureMissingAlert,
@@ -152,6 +157,9 @@ export default {
       showArticleSearchPopover: false,
       hasRecordedAudio: false,
       copilotAcceptedMessages: {},
+      batch: null,
+      batchSecondsLeft: 0,
+      batchTimer: null,
     };
   },
   computed: {
@@ -541,6 +549,8 @@ export default {
     },
     conversationIdByRoute(conversationId, oldConversationId) {
       if (conversationId !== oldConversationId) {
+        // Lo que estaba esperando en el chat anterior se envía ya (a ese chat, no a este).
+        this.flushBatch();
         this.switchDraftContext(conversationId, this.effectiveReplyMode);
         this.resetRecorderAndClearAttachments();
       }
@@ -604,6 +614,7 @@ export default {
     emitter.on(BUS_EVENTS.OPEN_CANNED_QUICK_CREATE, this.openCannedQuickCreate);
   },
   unmounted() {
+    this.flushBatch();
     document.removeEventListener('paste', this.onPaste);
     document.removeEventListener('keydown', this.handleKeyEvents);
     emitter.off(BUS_EVENTS.TOGGLE_REPLY_TO_MESSAGE, this.onReplyToMessage);
@@ -898,6 +909,12 @@ export default {
         // To handle both cases, text and attachments are always sent as separate messages.
         const isOnInstagram = this.isAnInstagramChannel;
         const isOnTiktok = this.isATiktokChannel;
+        if (isOnWhatsApp && !this.isPrivate && this.canBatchSend()) {
+          this.queueForBatch();
+          this.clearMessage();
+          this.hideEmojiPicker();
+          return;
+        }
         if ((isOnWhatsApp || isOnInstagram || isOnTiktok) && !this.isPrivate) {
           this.sendMessageAsMultipleMessages(
             this.message,
@@ -919,6 +936,89 @@ export default {
         this.clearMessage();
         this.hideEmojiPicker();
       }
+    },
+    // BuyPal: juntar en 5 s. No aplica a respuestas citando un mensaje, con firma o con audio grabado.
+    canBatchSend() {
+      return (
+        !this.inReplyTo?.id &&
+        !this.sendWithSignature &&
+        !this.attachedFiles.some(file => file.isVoiceMessage)
+      );
+    },
+    queueForBatch() {
+      const conversationId = this.currentChat.id;
+      if (this.batch && this.batch.conversationId !== conversationId) {
+        this.flushBatch();
+      }
+      if (!this.batch) {
+        this.batch = { conversationId, texts: [], files: [], sender: this.sender };
+      }
+      const text = (this.message || '').trim();
+      if (text) this.batch.texts.push(text);
+      this.batch.files.push(...this.attachedFiles);
+      this.batchSecondsLeft = BATCH_SECONDS;
+      if (!this.batchTimer) {
+        this.batchTimer = setInterval(() => {
+          this.batchSecondsLeft -= 1;
+          if (this.batchSecondsLeft <= 0) this.flushBatch();
+        }, 1000);
+      }
+    },
+    stopBatchTimer() {
+      clearInterval(this.batchTimer);
+      this.batchTimer = null;
+      this.batchSecondsLeft = 0;
+    },
+    // Envía lo juntado al chat donde se escribió (aunque ya se haya cambiado de chat).
+    flushBatch() {
+      const batch = this.batch;
+      this.batch = null;
+      this.stopBatchTimer();
+      if (!batch || (!batch.texts.length && !batch.files.length)) return;
+
+      const message = batch.texts.join('\n');
+      const payloads = [];
+      if (batch.files.length) {
+        let caption = message;
+        batch.files.forEach(file => {
+          payloads.push({
+            conversationId: batch.conversationId,
+            files: [this.attachmentForPayload(file)],
+            private: false,
+            message: caption,
+            sender: batch.sender,
+          });
+          caption = ''; // WhatsApp: solo la primera foto lleva el texto
+        });
+      } else {
+        payloads.push({
+          conversationId: batch.conversationId,
+          message,
+          private: false,
+          sender: batch.sender,
+        });
+      }
+      payloads.forEach(async payload => {
+        try {
+          await this.$store.dispatch('createPendingMessageAndSend', payload);
+          emitter.emit(BUS_EVENTS.SCROLL_TO_MESSAGE);
+          emitter.emit(BUS_EVENTS.MESSAGE_SENT);
+          this.sendMessageAnalyticsData(false, { editorMessage: payload.message || '' });
+        } catch (error) {
+          useAlert(
+            error?.response?.data?.error || this.$t('CONVERSATION.MESSAGE_ERROR')
+          );
+        }
+      });
+    },
+    // Cancelar: lo juntado vuelve a la caja para corregirlo (solo si sigue en el mismo chat).
+    cancelBatch() {
+      const batch = this.batch;
+      this.batch = null;
+      this.stopBatchTimer();
+      if (!batch || batch.conversationId !== this.currentChat.id) return;
+      this.message = batch.texts.join('\n');
+      this.attachedFiles = batch.files;
     },
     sendMessageAsMultipleMessages(message, copilotAcceptedMessage = '') {
       const messages = this.getMultipleMessagesPayload(message);
@@ -1424,6 +1524,28 @@ export default {
       leave-to-class="opacity-0 translate-y-2 scale-[0.98]"
     >
       <div :key="copilot.editorTransitionKey.value" class="reply-box__top">
+        <div
+          v-if="batch"
+          class="flex flex-wrap items-center gap-2 mx-3 mt-2 px-2 py-1 text-xs rounded-md bg-n-amber-3 text-n-amber-11"
+        >
+          <span class="i-lucide-clock size-3" />
+          <span>
+            Se enviará en {{ batchSecondsLeft }} s · lo que escribas ahora se junta
+            ({{ batch.texts.length }} texto{{ batch.texts.length === 1 ? '' : 's' }}{{
+              batch.files.length ? ` + ${batch.files.length} adjunto` : ''
+            }})
+          </span>
+          <button type="button" class="font-medium underline" @click="flushBatch">
+            Enviar ya
+          </button>
+          <button type="button" class="underline" @click="cancelBatch">
+            Cancelar
+          </button>
+        </div>
+        <CannedSuggestions
+          v-if="!isPrivate && !batch"
+          :messages="currentChat.messages || []"
+        />
         <ReplyToMessage
           v-if="shouldShowReplyToMessage"
           :message="inReplyTo"

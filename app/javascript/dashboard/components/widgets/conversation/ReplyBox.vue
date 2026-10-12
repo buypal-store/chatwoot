@@ -963,14 +963,13 @@ export default {
     },
     async askClaude() {
       const request = (this.message || '').trim();
-      if (!request) {
-        useAlert('Escribe primero qué necesitas de Claude (ej.: ofrécele el combo con bolsas).');
-        return;
-      }
-      const ok = await this.notifyClaude('claude', `🤖 Para Claude: ${request}`);
+      const note = request
+        ? `🤖 Para Claude: ayúdame a responder este chat. Indicación: ${request}`
+        : '🤖 Para Claude: ayúdame a responder este chat.';
+      const ok = await this.notifyClaude('claude', note);
       if (ok) {
-        this.clearMessage();
-        useAlert('Listo: Claude te dejará la respuesta como nota privada.');
+        if (request) this.clearMessage();
+        useAlert('Listo: Claude te dejará la respuesta en este chat como nota privada.');
       }
     },
     async orderWithClaude() {
@@ -1589,6 +1588,33 @@ export default {
             Cancelar
           </button>
         </div>
+        <div
+          v-if="!showAudioRecorderEditor"
+          class="flex flex-wrap items-center gap-1.5 mx-3 mt-2 px-2 py-1.5 rounded-lg bg-n-iris-3"
+        >
+          <span class="inline-flex items-center gap-1 text-xs font-medium text-n-iris-11">
+            <span class="i-lucide-bot size-4" />
+            Claude
+          </span>
+          <button
+            type="button"
+            class="inline-flex items-center gap-1 px-2.5 py-1 text-sm font-medium rounded-lg bg-n-solid-1 text-n-iris-11 outline outline-1 outline-n-iris-6 hover:bg-n-iris-2"
+            @mousedown.prevent
+            @click="askClaude"
+          >
+            <span class="i-lucide-message-circle size-4" />
+            Ayúdame a responder
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center gap-1 px-2.5 py-1 text-sm font-medium rounded-lg bg-n-solid-1 text-n-iris-11 outline outline-1 outline-n-iris-6 hover:bg-n-iris-2"
+            @mousedown.prevent
+            @click="orderWithClaude"
+          >
+            <span class="i-lucide-shopping-bag size-4" />
+            Toma este pedido
+          </button>
+        </div>
         <CannedSuggestions
           v-if="!isPrivate && !batch"
           :messages="currentChat.messages || []"
@@ -1749,8 +1775,6 @@ export default {
         @select-content-template="openContentTemplateModal"
         @toggle-insert-article="toggleInsertArticle"
         @toggle-quoted-reply="toggleQuotedReply"
-        @ask-claude="askClaude"
-        @order-with-claude="orderWithClaude"
       />
     </Transition>
 

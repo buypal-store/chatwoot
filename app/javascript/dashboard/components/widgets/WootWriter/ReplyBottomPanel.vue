@@ -131,8 +131,6 @@ export default {
     'selectWhatsappTemplate',
     'selectContentTemplate',
     'toggleQuotedReply',
-    'askClaude',
-    'orderWithClaude',
   ],
   setup(props) {
     const { setSignatureFlagForInbox, fetchSignatureFlagFromUISettings } =
@@ -316,24 +314,6 @@ export default {
         sm
         @mousedown.prevent
         @click="insertLineBreak"
-      />
-      <NextButton
-        v-if="!isEditorDisabled"
-        v-tooltip.top-end="'Pedir ayuda a Claude: escribe qué necesitas y aprieta (queda como nota privada)'"
-        icon="i-lucide-sparkles"
-        slate
-        faded
-        sm
-        @click="$emit('askClaude')"
-      />
-      <NextButton
-        v-if="!isEditorDisabled"
-        v-tooltip.top-end="'Tomar pedido con Claude'"
-        icon="i-lucide-shopping-bag"
-        slate
-        faded
-        sm
-        @click="$emit('orderWithClaude')"
       />
       <FileUpload
         v-if="showAttachButton"

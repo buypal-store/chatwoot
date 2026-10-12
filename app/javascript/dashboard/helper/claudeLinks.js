@@ -11,12 +11,14 @@ const RULES = `## Criterios (los mismos del chat "Subir pedidos")
 2. EL PAGO: Lima contra entrega sin adelanto. Provincia (Shalom) adelanto mínimo S/ 50. QR BBVA: VALIDADO solo si aparece en "Pagos recibidos" del ERP con el mismo nombre, monto y hora. Plin, Yape al número o depósito/transferencia BCP: NO subas hasta que alguien del equipo escriba "Validado" (POR VALIDAR).
 3. LOS DATOS: Lima: nombre, celular, dirección con referencia y ubicación de Google Maps. Provincia: nombre, DNI, celular, sede Shalom y correo.
 4. REPARTIDOR (turno tarde): chico → Miguel si está en su zona; grande → Van solo si cae en el área dibujada de Van (carga primero el área); si no, pregunta. Provincia: sede Shalom que reciba el tamaño.
-5. LA FECHA (hora de Lima): lunes a viernes después de 4:30 pm → mañana; sábado corte 1 pm; domingo no hay reparto.
-6. NO SUBIR DOBLE: justo antes de subir busca en la base por celular y DNI de los últimos 15 días; si existe, NO subas y avisa.
+5. LA FECHA (hora de Lima) ES OBLIGATORIA: lunes a viernes después de 4:30 pm → mañana; sábado corte 1 pm; domingo no hay reparto. Antes de subir confirma que el campo FECHA del formulario muestra la fecha correcta; si está vacío o no se ve, NO subas.
+6. NO SUBIR DOBLE: justo antes de subir busca en la base por celular y DNI de los últimos 15 días (incluidos los pedidos SIN fecha); si existe, NO subas y avisa.
 7. AGENTE: el pedido va a nombre del vendedor asignado al chat.
-Reglas de oro: no inventes precios, claves, guías ni pedidos; nunca ofrezcas descuentos ni acuerdos nuevos; cuida el servidor (una consulta a la vez); si algo no cuadra, pregunta antes de actuar.`;
+8. VERIFICA: después de subir, el pedido debe tener fecha y número (AAAAMMDD-N). Si entró sin fecha o sin número, FALLÓ: NO lo vuelvas a subir; avísame con el celular del cliente.
+Reglas de oro: un pedido sin fecha o sin número es FALLIDO y nunca se vuelve a subir por tu cuenta; no inventes precios, claves, guías ni pedidos; nunca ofrezcas descuentos ni acuerdos nuevos; cuida el servidor (una consulta a la vez); si algo no cuadra, pregunta antes de actuar.`;
 
-const today = () => new Date().toISOString().slice(0, 10);
+// Fecha de hoy en hora de Lima (UTC-5).
+const today = () => new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
 
 export const getClaudeFolder = () => {
   try {
@@ -50,7 +52,7 @@ export const buildOrderPrompt = ({ phone, chatId, inbox, agent }) => {
 Cliente: ${phone || '(sin número en Chatwoot)'} · chat #${chatId} · bandeja ${inbox}.
 Revisa ese chat, arma su pedido y súbelo por el tomador de pedidos de la línea, con estos criterios.
 ${approval}
-Después de subir: revisa que entró UNA sola vez, dame el número de pedido, deja la captura del pedido subido en el chat como nota privada, envía el mensaje de cierre y pon las etiquetas pedido-excel + la del live.
+Después de subir: revisa que entró UNA sola vez CON fecha y número (si no, regla 8), dame el número de pedido, deja la captura del pedido subido en el chat como nota privada, envía el mensaje de cierre y pon las etiquetas pedido-excel + la del live.
 ${RULES}`;
 };
 

@@ -63,6 +63,12 @@ import { LocalStorage } from 'shared/helpers/localStorage';
 import { emitter } from 'shared/helpers/mitt';
 import CannedQuickCreate from './CannedQuickCreate.vue';
 import CannedSuggestions from './CannedSuggestions.vue';
+import {
+  openClaude,
+  askClaudeFolder,
+  buildOrderPrompt,
+  buildHelpPrompt,
+} from 'dashboard/helper/claudeLinks';
 
 // BuyPal: lo que se envía seguido en WhatsApp espera unos segundos y sale junto en UN mensaje.
 const BATCH_SECONDS = 5;
@@ -961,27 +967,32 @@ export default {
         return false;
       }
     },
+    claudeContext() {
+      return {
+        phone: this.currentChat.meta?.sender?.phone_number || '',
+        chatId: this.currentChat.id,
+        inbox: this.inbox?.name || '',
+        agent: this.currentUser?.name || 'El asesor',
+      };
+    },
+    // Abre el Claude Code del asesor con la consulta escrita (él aprieta Enter). Deja una nota privada
+    // para que el equipo vea en el chat quién lo mandó a Claude.
     async askClaude() {
       const request = (this.message || '').trim();
-      const note = request
-        ? `🤖 Para Claude: ayúdame a responder este chat. Indicación: ${request}`
-        : '🤖 Para Claude: ayúdame a responder este chat.';
-      const ok = await this.notifyClaude('claude', note);
-      if (ok) {
-        if (request) this.clearMessage();
-        useAlert('Listo: Claude te dejará la respuesta en este chat como nota privada.');
-      }
+      const opened = openClaude(buildHelpPrompt({ ...this.claudeContext(), request }));
+      if (!opened) return;
+      if (request) this.clearMessage();
+      await this.notifyClaude('claude', `🤖 ${this.claudeContext().agent} pidió ayuda a Claude para responder.`);
+      useAlert('Se abrió tu Claude con la consulta lista: aprieta Enter.');
     },
     async orderWithClaude() {
-      const extra = (this.message || '').trim();
-      const ok = await this.notifyClaude(
-        'claude-pedido',
-        `🛍️ Para Claude: toma este pedido${extra ? ` (${extra})` : ''}. Valida el pago antes de subirlo.`
-      );
-      if (ok) {
-        if (extra) this.clearMessage();
-        useAlert('Listo: Claude armará el pedido y aparecerá en "Pedidos de Claude".');
-      }
+      const opened = openClaude(buildOrderPrompt(this.claudeContext()));
+      if (!opened) return;
+      await this.notifyClaude('claude-pedido', `🛍️ ${this.claudeContext().agent} mandó este pedido a Claude para subirlo.`);
+      useAlert('Se abrió tu Claude con el pedido listo: aprieta Enter.');
+    },
+    changeClaudeFolder() {
+      if (askClaudeFolder()) useAlert('Carpeta de Claude guardada.');
     },
     // BuyPal: juntar en 5 s. No aplica a respuestas citando un mensaje, con firma o con audio grabado.
     canBatchSend() {
@@ -1612,7 +1623,15 @@ export default {
             @click="orderWithClaude"
           >
             <span class="i-lucide-shopping-bag size-4" />
-            Toma este pedido
+            Subir con Claude
+          </button>
+          <button
+            type="button"
+            class="ms-auto text-xs underline text-n-iris-11"
+            @mousedown.prevent
+            @click="changeClaudeFolder"
+          >
+            carpeta
           </button>
         </div>
         <CannedSuggestions

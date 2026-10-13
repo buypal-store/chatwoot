@@ -14,8 +14,47 @@
       </button>
     </div>
 
+    <!-- BuyPal: aviso de corte (lun-vie 4:30 pm, sáb 1 pm, domingo todo el día; hora de Lima) -->
+    <div
+      v-if="afterCut && catalogUrl"
+      class="flex items-center gap-2 px-3 py-2 text-xs border-b bg-n-amber-3 text-n-amber-12 border-n-amber-7"
+    >
+      <span>⏰</span>
+      <span>
+        <b>Pasó el corte de {{ cutLabel }}.</b>
+        {{ todayConfirmed ? 'Vas con la fecha de hoy.' : 'Revisa que la FECHA sea de mañana.' }}
+      </span>
+    </div>
+
     <!-- Contenedor del catálogo (iframe) -->
-    <div class="flex-1 overflow-hidden">
+    <div class="relative flex-1 overflow-hidden">
+      <div
+        v-if="afterCut && catalogUrl && !cutAnswered"
+        class="absolute inset-0 z-10 flex items-center justify-center p-4 bg-black/50"
+      >
+        <div class="w-full max-w-xs p-5 text-center rounded-xl shadow-xl bg-n-solid-1 text-n-slate-12">
+          <p class="mb-1 text-base font-semibold">
+            ¿Seguro deseas tomar el pedido con la fecha de hoy?
+          </p>
+          <p class="text-sm text-n-slate-11">
+            Pasó el corte de {{ cutLabel }}: lo normal es mandarlo para mañana.
+          </p>
+          <div class="flex gap-2 mt-4">
+            <button
+              class="flex-1 py-2 text-sm font-semibold border rounded-lg border-n-weak"
+              @click="answerCut(false)"
+            >
+              No
+            </button>
+            <button
+              class="flex-1 py-2 text-sm font-semibold text-white bg-n-teal-9 rounded-lg"
+              @click="answerCut(true)"
+            >
+              Sí
+            </button>
+          </div>
+        </div>
+      </div>
       <iframe
         v-if="catalogUrl"
         :src="catalogUrl"
@@ -31,7 +70,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -50,6 +89,51 @@ const CATALOG_MAP = {
   5: 'https://buypal-store.github.io/sento_chatwoot/',
   8: 'https://buypal-store.github.io/sento_chatwoot/',
 };
+
+// BuyPal: corte de pedidos en hora de Lima (no la de la compu): lun-vie 4:30 pm, sáb 1 pm, domingo todo el día.
+// Al abrir el tomador después del corte pregunta Sí/No una vez; la franja recuerda poner la fecha de mañana.
+const limaNow = () => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Lima',
+    weekday: 'short',
+    hour: 'numeric',
+    minute: 'numeric',
+    hourCycle: 'h23',
+  }).formatToParts(new Date());
+  const get = type => parts.find(p => p.type === type)?.value;
+  return { day: get('weekday'), minutes: Number(get('hour')) * 60 + Number(get('minute')) };
+};
+const afterCut = ref(false);
+const cutLabel = ref('4:30 pm');
+const cutAnswered = ref(false);
+const todayConfirmed = ref(false);
+const checkCut = () => {
+  const { day, minutes } = limaNow();
+  if (day === 'Sun') {
+    afterCut.value = true;
+    cutLabel.value = 'hoy (domingo no hay reparto)';
+  } else if (day === 'Sat') {
+    afterCut.value = minutes >= 13 * 60;
+    cutLabel.value = '1 pm';
+  } else {
+    afterCut.value = minutes >= 16 * 60 + 30;
+    cutLabel.value = '4:30 pm';
+  }
+};
+const answerCut = yes => {
+  todayConfirmed.value = yes;
+  cutAnswered.value = true;
+};
+watch(
+  () => [props.visible, props.conversationId],
+  ([visible]) => {
+    if (!visible) return;
+    checkCut();
+    cutAnswered.value = false;
+    todayConfirmed.value = false;
+  },
+  { immediate: true }
+);
 
 const catalogUrl = computed(() => {
   if (!props.inboxId || !props.conversationId) return null;

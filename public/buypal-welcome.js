@@ -32,7 +32,7 @@
     campo:       'agente',
     base:        'created_at',         // created_at = cuándo se vendió · fecha = fecha del pedido
     vendedores:  ['Wendy', 'Cesar', 'Gian', 'Mesias'],
-    sinPerrito:  ['Wendy'],            // (12/10) sin perrito; mensaje, ranking, sonido y confeti siguen igual
+    sinPerrito:  ['Wendy'],            // (12/10) sin perrito, sin sonido, sin aviso de bienvenida y sin confeti; el ranking sigue
   };
 
   /* ================== CSS (se inyecta solo) ================== */
@@ -266,6 +266,7 @@
   }
 
   function sonarConfeti() {
+    if (sinPerro()) return;
     if (volumen <= 0) return;
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     if (audioURL) {
@@ -312,7 +313,7 @@
 
   function lanzarConfeti(cantidad, duracion) {
     pararConfeti();
-    if (!cantidad) return;
+    if (!cantidad || sinPerro()) return;
     sonarConfeti();
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     var cv = document.createElement('canvas');
@@ -891,7 +892,7 @@
         var animado = (CONFIG.animar || CONFIG.vendedores || []).some(function (v) {
           return normal(v) === yoP;
         });
-        if (!animado || yaVisto()) {
+        if (!animado || yaVisto() || sinPerro()) {
           soloTab();
         } else {
           marcarVisto();

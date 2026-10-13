@@ -32,8 +32,9 @@ const {
   contentAttributes,
 } = useMessageContext();
 
+// BuyPal: solo la hora; la fecha ya está en el corte por fecha de la lista.
 const readableTime = computed(() =>
-  messageTimestamp(createdAt.value, 'LLL d, h:mm a')
+  messageTimestamp(createdAt.value, 'h:mm a')
 );
 
 const showStatusIndicator = computed(() => {

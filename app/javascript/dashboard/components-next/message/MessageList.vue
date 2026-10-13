@@ -41,6 +41,30 @@ const props = defineProps({
 
 const emit = defineEmits(['retry']);
 
+// BuyPal: corte por fecha. Cuando un mensaje es de otro día que el anterior, sale una franja con la fecha
+// (Hoy / Ayer / dd-mm-aaaa). Se calcula en el navegador con la hora de cada mensaje: cero consultas.
+const dayKey = ts => {
+  const d = new Date(ts * 1000);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+};
+const showDateCut = index => {
+  const list = allMessages.value;
+  if (!list[index]?.createdAt) return false;
+  if (index === 0) return true;
+  return dayKey(list[index].createdAt) !== dayKey(list[index - 1].createdAt);
+};
+const dateCutLabel = ts => {
+  const d = new Date(ts * 1000);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (dayKey(ts) === dayKey(today / 1000)) return 'Hoy';
+  if (dayKey(ts) === dayKey(yesterday / 1000)) return 'Ayer';
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}-${mm}-${d.getFullYear()}`;
+};
+
 const allMessages = computed(() => {
   return useCamelCase(props.messages, {
     deep: true,
@@ -169,6 +193,16 @@ const getInReplyToMessage = parentMessage => {
   <ul class="px-4 bg-n-surface-1">
     <slot name="beforeAll" />
     <template v-for="(message, index) in allMessages" :key="message.id">
+      <li
+        v-if="showDateCut(index)"
+        class="sticky top-0 z-10 flex justify-center py-2 list-none pointer-events-none"
+      >
+        <span
+          class="px-3 py-0.5 text-xs font-semibold rounded-lg shadow-sm bg-n-solid-blue text-n-blue-text outline outline-1 outline-n-blue-border"
+        >
+          {{ dateCutLabel(message.createdAt) }}
+        </span>
+      </li>
       <slot
         v-if="firstUnreadId && message.id === firstUnreadId"
         name="unreadBadge"

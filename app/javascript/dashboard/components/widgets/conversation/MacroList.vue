@@ -4,6 +4,9 @@ import { useI18n } from 'vue-i18n';
 import { useStore, useMapGetter } from 'dashboard/composables/store';
 import { useOrderedMacros } from 'dashboard/composables/useOrderedMacros';
 import { useMacros } from 'dashboard/composables/useMacros';
+import { useAccount } from 'dashboard/composables/useAccount';
+import { useAdmin } from 'dashboard/composables/useAdmin';
+import { useAlert } from 'dashboard/composables';
 import CaretAnchoredPicker from 'dashboard/components-next/preview-picker/CaretAnchoredPicker.vue';
 
 const props = defineProps({
@@ -48,6 +51,35 @@ const items = computed(() =>
 
 const onSelect = item => emit('selectMacro', item.macro);
 
+// BuyPal: editar y borrar desde este buscador (#). Solo si el usuario puede: las públicas las cambia un
+// administrador; las personales, quien las creó (misma regla que valida el servidor).
+const { accountScopedUrl } = useAccount();
+const { isAdmin } = useAdmin();
+const currentUser = useMapGetter('getCurrentUser');
+const deletingId = ref(null);
+const canManage = macro => {
+  if (!macro) return false;
+  if (macro.visibility === 'global') return isAdmin.value;
+  return macro.created_by?.id === currentUser.value?.id;
+};
+const editMacro = macro => {
+  // Pestaña nueva: el chat sigue abierto donde estaba.
+  window.open(accountScopedUrl(`settings/macros/${macro.id}/edit`), '_blank');
+};
+const deleteMacro = async macro => {
+  // eslint-disable-next-line no-alert
+  if (!window.confirm(`¿Borrar la macro "${macro.name}"? No se puede deshacer.`)) return;
+  deletingId.value = macro.id;
+  try {
+    await store.dispatch('macros/delete', macro.id);
+    useAlert(t('MACROS.DELETE.API.SUCCESS_MESSAGE'));
+  } catch (error) {
+    useAlert(t('MACROS.DELETE.API.ERROR_MESSAGE'));
+  } finally {
+    deletingId.value = null;
+  }
+};
+
 onMounted(() => {
   if (!orderedMacros.value.length) store.dispatch('macros/get');
 });
@@ -67,6 +99,29 @@ onMounted(() => {
   >
     <template #preview="{ item }">
       <div v-if="item" class="px-4 py-3">
+        <div
+          v-if="canManage(item.macro)"
+          class="flex gap-2 pb-2 mb-2 border-b border-n-weak"
+          @mousedown.prevent
+        >
+          <button
+            type="button"
+            class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md outline outline-1 outline-n-weak text-n-slate-12 hover:bg-n-alpha-2"
+            @click="editMacro(item.macro)"
+          >
+            <span class="i-lucide-pencil size-3.5" />
+            Editar
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md outline outline-1 outline-n-ruby-6 text-n-ruby-11 hover:bg-n-ruby-2 disabled:opacity-50"
+            :disabled="deletingId === item.macro.id"
+            @click="deleteMacro(item.macro)"
+          >
+            <span class="i-lucide-trash-2 size-3.5" />
+            Borrar
+          </button>
+        </div>
         <div
           v-for="(action, index) in resolveMacroActions(item.macro)"
           :key="index"

@@ -3,8 +3,10 @@
 // Link oficial: claude://code/new?folder=<carpeta>&q=<texto>  (support.claude.com, "Open Claude Desktop with a link")
 
 const FOLDER_KEY = 'buypal_claude_folder';
-// Semana de prueba: hasta esta fecha (inclusive) Claude pregunta "¿subo?" una vez antes de subir.
-const TRIAL_UNTIL = '2026-10-19';
+// Modo revisión (13/10, decisión de Wendy): Claude SIEMPRE pide el sí del asesor antes de subir o de enviar,
+// sin fecha de vencimiento. Para que el botón ya sea el sí, poner false (y publicar una versión nueva).
+const CONFIRM_ORDER = true;
+const CONFIRM_HELP = true;
 
 const RULES = `## Criterios (los mismos del chat "Subir pedidos")
 1. EL PEDIDO: producto y precio del chat o del catálogo del live (BP-/SE-/ST-); si no se acordó precio, el de la ficha; si hay diferencia, pregunta. Revisa stock antes de subir. Regalos: S22 → 60 bolsitas · BabyPal > S/ 89 → dispensador verde (salvo que ya lleve uno) · Sento → guantes · Strenko → balanza · cámaras → memoria 64 GB. Envío Lima solo si el pedido es menor a S/ 79: S/ 8 San Isidro, San Borja, La Victoria, Lince, Surco · S/ 10 Jesús María, Rímac, Surquillo · S/ 12 SMP, Los Olivos, Santa Anita, La Molina · S/ 15 Comas · otro distrito: pregunta. Van: S/ 10 a S/ 15, si dudas pregunta.
@@ -17,9 +19,6 @@ const RULES = `## Criterios (los mismos del chat "Subir pedidos")
 9. PLATAFORMA (TIKTOKER) OBLIGATORIA: sale de la etiqueta del live del chat: live-<nombre> → "<NOMBRE> - TKTOK" (ej. live-aixa → AIXA - TKTOK); si hay varias, la más reciente. Si no hay etiqueta de live o no encuentras el chat del cliente, NO adivines: pregúntale al asesor del chat qué tiktoker o plataforma va. En la captura debe verse la plataforma llena.
 8. VERIFICA: después de subir, el pedido debe tener fecha y número (AAAAMMDD-N). Si entró sin fecha o sin número, FALLÓ: NO lo vuelvas a subir; avísame con el celular del cliente.
 Reglas de oro: un pedido sin fecha o sin número es FALLIDO y nunca se vuelve a subir por tu cuenta; no inventes precios, claves, guías ni pedidos; nunca ofrezcas descuentos ni acuerdos nuevos; cuida el servidor (una consulta a la vez); si algo no cuadra, pregunta antes de actuar.`;
-
-// Fecha de hoy en hora de Lima (UTC-5).
-const today = () => new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
 
 export const getClaudeFolder = () => {
   try {
@@ -45,9 +44,8 @@ export const askClaudeFolder = () => {
 };
 
 export const buildOrderPrompt = ({ phone, chatId, inbox, agent }) => {
-  const trial = today() <= TRIAL_UNTIL;
-  const approval = trial
-    ? `SEMANA DE PRUEBA (hasta el ${TRIAL_UNTIL}): cuando todo esté listo, muéstrame la captura del formulario y pregunta "¿subo?" UNA sola vez. Con mi sí, súbelo.`
+  const approval = CONFIRM_ORDER
+    ? 'MODO REVISIÓN: cuando todo esté listo, muéstrame la captura del formulario y pregunta "¿subo?" UNA sola vez. Con mi sí, súbelo.'
     : 'Apretar el botón YA ES MI SÍ: si el pago está VALIDADO, los datos completos y no hay pedido doble, súbelo sin preguntar. Si falta algo o no cuadra, NO subas: pregúntale el dato al cliente o avísame.';
   return `${agent} apretó "Subir con Claude" en Chatwoot.
 Cliente: ${phone || '(sin número en Chatwoot)'} · chat #${chatId} · bandeja ${inbox}.
@@ -58,9 +56,8 @@ ${RULES}`;
 };
 
 export const buildHelpPrompt = ({ phone, chatId, inbox, agent, request }) => {
-  const trial = today() <= TRIAL_UNTIL;
-  const approval = trial
-    ? `SEMANA DE PRUEBA (hasta el ${TRIAL_UNTIL}): muéstrame la respuesta y espera mi sí antes de enviarla.`
+  const approval = CONFIRM_HELP
+    ? 'MODO REVISIÓN: muéstrame la respuesta y espera mi sí antes de enviarla.'
     : 'Apretar el botón YA ES MI SÍ: si todo es información general, envíala directo. Si hay algo delicado (abajo), envía igual lo general y avísame lo delicado.';
   return `${agent} apretó "Responder todo con Claude" en Chatwoot.
 Cliente: ${phone || '(sin número)'} · chat #${chatId} · bandeja ${inbox}.

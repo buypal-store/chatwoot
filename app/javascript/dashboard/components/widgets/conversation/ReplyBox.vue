@@ -72,6 +72,8 @@ import {
 
 // BuyPal: lo que se envía seguido en WhatsApp espera unos segundos y sale junto en UN mensaje.
 const BATCH_SECONDS = 5;
+// (13/10) Wendy decidió NO usar 'juntar en 5 s': apagado. Para prenderlo, poner true.
+const BATCH_ENABLED = false;
 import {
   findSentDuplicate,
   confirmResend,
@@ -997,6 +999,7 @@ export default {
     // BuyPal: juntar en 5 s. No aplica a respuestas citando un mensaje, con firma o con audio grabado.
     canBatchSend() {
       return (
+        BATCH_ENABLED &&
         !this.inReplyTo?.id &&
         !this.sendWithSignature &&
         !this.attachedFiles.some(file => file.isVoiceMessage)

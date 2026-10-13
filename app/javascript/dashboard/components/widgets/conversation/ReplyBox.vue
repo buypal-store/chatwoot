@@ -137,6 +137,7 @@ export default {
   },
   data() {
     return {
+      claudeHint: '',
       message: '',
       inReplyTo: {},
       isFocused: false,
@@ -559,6 +560,7 @@ export default {
       if (conversationId !== oldConversationId) {
         // Lo que estaba esperando en el chat anterior se envía ya (a ese chat, no a este).
         this.flushBatch();
+        this.claudeHint = '';
         this.switchDraftContext(conversationId, this.effectiveReplyMode);
         this.resetRecorderAndClearAttachments();
       }
@@ -979,19 +981,50 @@ export default {
     },
     // Abre el Claude Code del asesor con la consulta escrita (él aprieta Enter). Deja una nota privada
     // para que el equipo vea en el chat quién lo mandó a Claude.
+    // Cada clic abre UNA sesión nueva de Claude (el link no puede reusar una abierta). Si el mismo chat ya se
+    // mandó hace menos de 10 min, pregunta antes, para no abrir sesiones repetidas.
+    claudeRecentlySent(kind) {
+      const key = `buypal_claude_${kind}_${this.conversationId}`;
+      let last = 0;
+      try {
+        last = Number(window.localStorage.getItem(key) || 0);
+      } catch (e) {
+        last = 0;
+      }
+      const minutes = Math.round((Date.now() - last) / 60000);
+      // eslint-disable-next-line no-alert
+      if (last && minutes < 10 && !window.confirm(`Ya mandaste este chat a Claude hace ${minutes} min. Revisa tu app de Claude. ¿Abrir otra sesión igual?`)) {
+        return true;
+      }
+      try {
+        window.localStorage.setItem(key, String(Date.now()));
+      } catch (e) {
+        // sin localStorage: no se recuerda
+      }
+      return false;
+    },
+    showClaudeHint(text) {
+      this.claudeHint = text;
+      clearTimeout(this.claudeHintTimer);
+      this.claudeHintTimer = setTimeout(() => {
+        this.claudeHint = '';
+      }, 30000);
+    },
     async askClaude() {
+      if (this.claudeRecentlySent('ayuda')) return;
       const request = (this.message || '').trim();
       const opened = openClaude(buildHelpPrompt({ ...this.claudeContext(), request }));
       if (!opened) return;
       if (request) this.clearMessage();
-      await this.notifyClaude('claude', `🤖 ${this.claudeContext().agent} mandó este chat a Claude para responder todo.`);
-      useAlert('Se abrió tu Claude con el chat listo: aprieta Enter.');
+      this.showClaudeHint('👉 Se abrió tu app de Claude: ve a esa ventana y aprieta Enter. Claude te muestra la respuesta ahí y la envía solo con tu sí.');
+      await this.notifyClaude('claude', `🤖 ${this.claudeContext().agent} derivó este chat a Claude.`);
     },
     async orderWithClaude() {
+      if (this.claudeRecentlySent('pedido')) return;
       const opened = openClaude(buildOrderPrompt(this.claudeContext()));
       if (!opened) return;
+      this.showClaudeHint('👉 Se abrió tu app de Claude: ve a esa ventana y aprieta Enter. Claude arma el pedido y lo sube solo con tu sí.');
       await this.notifyClaude('claude-pedido', `🛍️ ${this.claudeContext().agent} mandó este pedido a Claude para subirlo.`);
-      useAlert('Se abrió tu Claude con el pedido listo: aprieta Enter.');
     },
     changeClaudeFolder() {
       if (askClaudeFolder()) useAlert('Carpeta de Claude guardada.');
@@ -1635,6 +1668,15 @@ export default {
             @click="changeClaudeFolder"
           >
             carpeta
+          </button>
+        </div>
+        <div
+          v-if="claudeHint"
+          class="flex items-start gap-2 px-3 py-2 mx-1 mb-1 text-sm rounded-lg bg-n-amber-3 text-n-amber-12 outline outline-1 outline-n-amber-7"
+        >
+          <span class="flex-1">{{ claudeHint }}</span>
+          <button type="button" class="text-xs underline" @click="claudeHint = ''">
+            Ok
           </button>
         </div>
         <CannedSuggestions

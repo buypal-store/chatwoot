@@ -59,7 +59,7 @@ export const buildHelpPrompt = ({ phone, chatId, inbox, agent, request }) => {
   const approval = CONFIRM_HELP
     ? 'MODO REVISIÓN: muéstrame la respuesta y espera mi sí antes de enviarla.'
     : 'Apretar el botón YA ES MI SÍ: si todo es información general, envíala directo. Si hay algo delicado (abajo), envía igual lo general y avísame lo delicado.';
-  return `${agent} apretó "Responder todo con Claude" en Chatwoot.
+  return `${agent} apretó "Derivar a Claude" en Chatwoot.
 Cliente: ${phone || '(sin número)'} · chat #${chatId} · bandeja ${inbox}.
 ${request ? `Indicación del asesor: ${request}\n` : ''}OBJETIVO: contestar TODAS las preguntas pendientes del cliente en UN SOLO mensaje (1 burbuja), para ahorrar tiempo y mensajes.
 1. Lee todos los mensajes del cliente desde la última respuesta del equipo y lista cada pregunta.

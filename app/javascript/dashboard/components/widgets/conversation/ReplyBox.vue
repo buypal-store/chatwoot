@@ -1617,7 +1617,7 @@ export default {
             @click="askClaude"
           >
             <span class="i-lucide-message-circle size-4" />
-            Responder todo con Claude
+            Derivar a Claude
           </button>
           <button
             type="button"

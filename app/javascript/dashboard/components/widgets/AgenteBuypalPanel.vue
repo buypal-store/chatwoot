@@ -28,6 +28,15 @@ const route = useRoute();
 const router = useRouter();
 const carpetas = useMapGetter('customViews/getConversationCustomViews');
 const numeros = ref({});
+const latido = ref({});            // fila que acaba de subir de número: un solo pulso suave (no parpadea)
+// Recordatorio de los primeros días: "lo del agente está en estas carpetas". Se cierra con ✕ y no vuelve a salir.
+const LLAVE_AVISO = 'agente_buypal_aviso_visto';
+const verAviso = ref(false);
+try { verAviso.value = localStorage.getItem(LLAVE_AVISO) !== '1'; } catch (e) { verAviso.value = false; }
+const cerrarAviso = () => {
+  verAviso.value = false;
+  try { localStorage.setItem(LLAVE_AVISO, '1'); } catch (e) { console.warn('Agente Buypal: no se pudo recordar el aviso', e && e.message); }
+};
 let reloj = null;
 
 const accountId = computed(() => route.params.accountId);
@@ -42,15 +51,24 @@ const activa = c => {
   return Boolean(v) && String(route.params.id) === String(v.id) && /custom_view/.test(route.path);
 };
 
+function guardarNumeros(nuevos) {
+  const antes = numeros.value;
+  const subio = {};
+  ['ayuda', 'tomados'].forEach(k => { if ((nuevos[k] || 0) > (antes[k] || 0) && antes[k] !== undefined) subio[k] = true; });
+  numeros.value = nuevos;
+  latido.value = subio;
+  if (Object.keys(subio).length) setTimeout(() => { latido.value = {}; }, 1600);
+}
+
 async function contar() {
   if (document.hidden) return;
   try {
     if (ES_PRUEBAS) {
       const r = await Promise.all(CARPETAS.map(c => ConversationApi.filter({ queryData: consulta(c), page: 1 })));
-      numeros.value = Object.fromEntries(CARPETAS.map((c, i) => [c.clave, (r[i].data && r[i].data.meta && r[i].data.meta.all_count) || 0]));
+      guardarNumeros(Object.fromEntries(CARPETAS.map((c, i) => [c.clave, (r[i].data && r[i].data.meta && r[i].data.meta.all_count) || 0])));
     } else {
       const r = await fetch(ERP, { signal: AbortSignal.timeout(8000) });
-      if (r.ok) numeros.value = await r.json();
+      if (r.ok) guardarNumeros(await r.json());
     }
   } catch (e) {
     // Sin números no se rompe nada: la cajita sigue funcionando como acceso a las carpetas
@@ -88,18 +106,27 @@ onBeforeUnmount(() => clearInterval(reloj));
       <button
         v-for="c in CARPETAS"
         :key="c.clave"
-        class="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-sm font-semibold text-left"
+        class="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-sm font-semibold text-left agente-fila"
+        :class="{ 'agente-latido': latido[c.clave] }"
         :style="{ background: c.fondo, color: c.texto, outline: activa(c) ? '2px solid currentColor' : 'none' }"
         @click="abrir(c)"
       >
         <span>{{ c.nombre }}</span>
+        <!-- Solo 🔴 y 🟢 piden acción: burbuja con número. 🟡 solo número gris (no pide nada). -->
         <span
-          v-if="c.burbuja && numeros[c.clave]"
+          v-if="c.clave !== 'atendiendo' && numeros[c.clave]"
           class="rounded-full px-2 text-xs text-white"
-          style="background: #16a34a"
+          :style="{ background: c.clave === 'ayuda' ? '#dc2626' : '#16a34a' }"
         >{{ numeros[c.clave] }}</span>
-        <span v-else-if="!c.burbuja">{{ numeros[c.clave] ?? '' }}</span>
+        <span v-else-if="c.clave === 'atendiendo'" class="text-xs opacity-70">{{ numeros[c.clave] ?? '' }}</span>
       </button>
+      <div
+        v-if="verAviso"
+        class="flex items-start gap-2 rounded-lg px-2.5 py-1.5 text-xs text-n-slate-11 bg-n-alpha-1"
+      >
+        <span class="flex-1">💡 Los chats que atiende el agente no salen en "Mías": están aquí arriba. 🔴 y 🟢 te necesitan.</span>
+        <button class="opacity-60" title="Entendido" @click="cerrarAviso">✕</button>
+      </div>
       <button
         class="rounded-lg px-2.5 py-1 text-sm text-n-slate-11 bg-n-alpha-2"
         @click="verTodos"
@@ -109,3 +136,10 @@ onBeforeUnmount(() => clearInterval(reloj));
     </div>
   </div>
 </template>
+
+<style scoped>
+.agente-fila { transition: transform 0.3s ease; }
+/* Un solo pulso suave cuando llega un chat nuevo a 🔴 o 🟢 (no parpadea ni se repite) */
+.agente-latido { animation: agente-pulso 0.8s ease 2; }
+@keyframes agente-pulso { 50% { transform: scale(1.03); box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06); } }
+</style>

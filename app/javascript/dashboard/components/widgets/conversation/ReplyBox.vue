@@ -1635,50 +1635,7 @@ export default {
             Cancelar
           </button>
         </div>
-        <div
-          v-if="!showAudioRecorderEditor"
-          class="flex flex-wrap items-center gap-1.5 mx-3 mt-2 px-2 py-1.5 rounded-lg bg-n-iris-3"
-        >
-          <span class="inline-flex items-center gap-1 text-xs font-medium text-n-iris-11">
-            <span class="i-lucide-bot size-4" />
-            Claude
-          </span>
-          <button
-            type="button"
-            class="inline-flex items-center gap-1 px-2.5 py-1 text-sm font-medium rounded-lg bg-n-solid-1 text-n-iris-11 outline outline-1 outline-n-iris-6 hover:bg-n-iris-2"
-            @mousedown.prevent
-            @click="askClaude"
-          >
-            <span class="i-lucide-message-circle size-4" />
-            Derivar a Claude
-          </button>
-          <button
-            type="button"
-            class="inline-flex items-center gap-1 px-2.5 py-1 text-sm font-medium rounded-lg bg-n-solid-1 text-n-iris-11 outline outline-1 outline-n-iris-6 hover:bg-n-iris-2"
-            @mousedown.prevent
-            @click="orderWithClaude"
-          >
-            <span class="i-lucide-shopping-bag size-4" />
-            Subir con Claude
-          </button>
-          <button
-            type="button"
-            class="ms-auto text-xs underline text-n-iris-11"
-            @mousedown.prevent
-            @click="changeClaudeFolder"
-          >
-            carpeta
-          </button>
-        </div>
-        <div
-          v-if="claudeHint"
-          class="flex items-start gap-2 px-3 py-2 mx-1 mb-1 text-sm rounded-lg bg-n-amber-3 text-n-amber-12 outline outline-1 outline-n-amber-7"
-        >
-          <span class="flex-1">{{ claudeHint }}</span>
-          <button type="button" class="text-xs underline" @click="claudeHint = ''">
-            Ok
-          </button>
-        </div>
+        <!-- BuyPal 22/10: se quitaron los botones de Claude (Derivar / Subir con Claude), pedido de Wendy: no funcionaron bien. -->
         <CannedSuggestions
           v-if="!isPrivate && !batch"
           :messages="currentChat.messages || []"

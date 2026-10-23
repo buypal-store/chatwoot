@@ -12,22 +12,28 @@ export function useOrderedMacros() {
   const { uiSettings, updateUISettings } = useUISettings();
   const macros = useMapGetter('macros/getMacros');
 
+  // Buypal (23/10, Wendy: "que salgan arriba a la mano"): Apagar/Prender Peldaño siempre primero, para todos
+  const primeroPeldano = list => [
+    ...list.filter(m => /pelda[ñn]o/i.test(m.name || '')),
+    ...list.filter(m => !/pelda[ñn]o/i.test(m.name || '')),
+  ];
+
   const orderedMacros = computed({
     get: () => {
       const savedOrder = uiSettings.value?.[MACROS_ORDER_KEY] ?? [];
       const currentMacros = macros.value ?? [];
 
       if (!savedOrder.length || !currentMacros.length) {
-        return currentMacros;
+        return primeroPeldano(currentMacros);
       }
 
       const orderMap = new Map(savedOrder.map((id, index) => [id, index]));
 
       // Anything the agent never arranged keeps its store order, at the end
-      return [...currentMacros].sort(
+      return primeroPeldano([...currentMacros].sort(
         (a, b) =>
           (orderMap.get(a.id) ?? Infinity) - (orderMap.get(b.id) ?? Infinity)
-      );
+      ));
     },
     set: newOrder => {
       updateUISettings({

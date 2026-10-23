@@ -14,12 +14,12 @@ import { frontendURL } from 'dashboard/helper/URLHelper';
 // (22/10 noche) Las carpetas filtran por las etiquetas que pone el agente (ia-asesor / ia-atiende / ia-pedido), no por la
 // prioridad ni el estado a secas: una automatización antigua pone "Urgente" a muchos chats y hay pendientes de meses.
 const CARPETAS = [
-  { clave: 'ayuda', nombre: '🔴 Necesita un asesor', fondo: '#fee2e2', texto: '#991b1b',
+  { clave: 'ayuda', nombre: '🔴 Necesita un asesor', punto: '#ef4444', uno: 'pendiente', varios: 'pendientes',
     cond: [['labels', 'equal_to', ['ia-asesor']], ['status', 'equal_to', ['open']]] },
-  { clave: 'atendiendo', nombre: '🟡 Atendiendo', fondo: '#fef9c3', texto: '#854d0e',
+  { clave: 'atendiendo', nombre: '🟡 Atendiendo', punto: '#facc15', uno: 'atendiendo', varios: 'atendiendo',
     cond: [['labels', 'equal_to', ['ia-atiende']], ['status', 'equal_to', ['pending']]] },
-  { clave: 'tomados', nombre: '🟢 Pedidos tomados', fondo: '#dcfce7', texto: '#166534',
-    cond: [['labels', 'equal_to', ['ia-pedido']], ['status', 'equal_to', ['open']]], burbuja: true },
+  { clave: 'tomados', nombre: '🟢 Pedidos tomados', punto: '#22c55e', uno: 'pedido', varios: 'pedidos',
+    cond: [['labels', 'equal_to', ['ia-pedido']], ['status', 'equal_to', ['open']]] },
 ];
 const ES_PRUEBAS = /pruebas/.test(window.location.host);
 const ERP = 'https://erp.buypal.com.pe/api/agentesIA?resumen=1&fuente=' + (ES_PRUEBAS ? 'pruebas' : 'produccion');
@@ -38,6 +38,14 @@ try { verAviso.value = localStorage.getItem(LLAVE_AVISO) !== '1'; } catch (e) { 
 const cerrarAviso = () => {
   verAviso.value = false;
   try { localStorage.setItem(LLAVE_AVISO, '1'); } catch (e) { console.warn('Agente Buypal: no se pudo recordar el aviso', e && e.message); }
+};
+// Plegar la cajita (se recuerda en este navegador)
+const LLAVE_PLEGADA = 'agente_buypal_plegada';
+const plegada = ref(false);
+try { plegada.value = localStorage.getItem(LLAVE_PLEGADA) === '1'; } catch (e) { plegada.value = false; }
+const plegar = () => {
+  plegada.value = !plegada.value;
+  try { localStorage.setItem(LLAVE_PLEGADA, plegada.value ? '1' : '0'); } catch (e) { console.warn('Agente Buypal: no se pudo recordar', e && e.message); }
 };
 let reloj = null;
 
@@ -97,7 +105,6 @@ async function abrir(c) {
   }
   if (v) router.push(frontendURL(`accounts/${accountId.value}/custom_view/${v.id}`));
 }
-const verTodos = () => router.push(frontendURL(`accounts/${accountId.value}/dashboard`));
 
 onMounted(() => {
   if (!(carpetas.value || []).length) store.dispatch('customViews/get', 'conversation');
@@ -108,39 +115,37 @@ onBeforeUnmount(() => clearInterval(reloj));
 </script>
 
 <template>
-  <div class="mx-3 my-2 p-2 rounded-xl border border-n-weak">
-    <div class="text-sm font-semibold mb-1.5 text-n-slate-12">🤖 Agente Buypal</div>
-    <div class="flex flex-col gap-1.5">
+  <!-- (23/10, diseño de Wendy) Compacta: título + punto de encendido + flecha para plegar; una fila con 3 botones. -->
+  <div class="mx-3 my-2 px-3 py-2 rounded-xl border border-n-weak">
+    <button class="w-full flex items-center gap-2 text-sm font-semibold text-n-slate-12" @click="plegar">
+      <span>🤖 Agente Buypal</span>
+      <span
+        class="inline-block w-2 h-2 rounded-full"
+        :style="{ background: numeros.activo === false ? '#9ca3af' : '#22c55e' }"
+        :title="numeros.activo === false ? 'Agente apagado' : 'Agente encendido'"
+      />
+      <span class="ml-auto text-n-slate-10 transition-transform" :style="{ transform: plegada ? 'rotate(-90deg)' : 'none' }">⌄</span>
+    </button>
+    <div v-if="!plegada" class="grid grid-cols-3 gap-1.5 mt-2">
       <button
         v-for="c in CARPETAS"
         :key="c.clave"
-        class="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-sm font-semibold text-left agente-fila"
+        class="flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-n-slate-12 bg-n-alpha-1 hover:bg-n-alpha-2 agente-fila"
         :class="{ 'agente-latido': latido[c.clave] }"
-        :style="{ background: c.fondo, color: c.texto, outline: activa(c) ? '2px solid currentColor' : 'none' }"
+        :style="{ outline: activa(c) ? '1.5px solid ' + c.punto : 'none' }"
+        :title="c.nombre"
         @click="abrir(c)"
       >
-        <span>{{ c.nombre }}</span>
-        <!-- Solo 🔴 y 🟢 piden acción: burbuja con número. 🟡 solo número gris (no pide nada). -->
-        <span
-          v-if="c.clave !== 'atendiendo' && numeros[c.clave]"
-          class="rounded-full px-2 text-xs text-white"
-          :style="{ background: c.clave === 'ayuda' ? '#dc2626' : '#16a34a' }"
-        >{{ numeros[c.clave] }}</span>
-        <span v-else-if="c.clave === 'atendiendo'" class="text-xs opacity-70">{{ numeros[c.clave] ?? '' }}</span>
+        <span class="inline-block w-2.5 h-2.5 rounded-full shrink-0" :style="{ background: c.punto }" />
+        <span class="truncate">{{ numeros[c.clave] ?? 0 }} {{ (numeros[c.clave] ?? 0) === 1 ? c.uno : c.varios }}</span>
       </button>
-      <div
-        v-if="verAviso"
-        class="flex items-start gap-2 rounded-lg px-2.5 py-1.5 text-xs text-n-slate-11 bg-n-alpha-1"
-      >
-        <span class="flex-1">💡 Los chats que atiende el agente no salen en "Mías": están aquí arriba. 🔴 y 🟢 te necesitan.</span>
-        <button class="opacity-60" title="Entendido" @click="cerrarAviso">✕</button>
-      </div>
-      <button
-        class="rounded-lg px-2.5 py-1 text-sm text-n-slate-11 bg-n-alpha-2"
-        @click="verTodos"
-      >
-        Ver todos
-      </button>
+    </div>
+    <div
+      v-if="verAviso && !plegada"
+      class="flex items-start gap-2 rounded-lg mt-1.5 px-2.5 py-1.5 text-xs text-n-slate-11 bg-n-alpha-1"
+    >
+      <span class="flex-1">💡 Lo que atiende el agente no sale en "Mías": está aquí. 🔴 y 🟢 te necesitan.</span>
+      <button class="opacity-60" title="Entendido" @click="cerrarAviso">✕</button>
     </div>
   </div>
 </template>

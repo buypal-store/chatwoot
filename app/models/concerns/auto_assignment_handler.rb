@@ -23,7 +23,9 @@ module AutoAssignmentHandler
   def run_auto_assignment
     # Assignment V2: Also trigger assignment when conversation is resolved or snoozed,
     # bypassing the open-only condition so the AssignmentJob can redistribute capacity.
-    return unless conversation_status_changed_to_open? || conversation_status_changed_to_resolved_or_snoozed?
+    # Buypal (23/10, Wendy): con el Agente Buypal conectado el chat nace "Pendiente" y no se repartía. Se reparte igual
+    # que siempre al crearse (mismo round robin de asesores conectados); el bot solo contesta.
+    return unless conversation_status_changed_to_open? || conversation_status_changed_to_resolved_or_snoozed? || nuevo_pendiente_con_bot?
     return unless should_run_auto_assignment?
 
     if inbox.auto_assignment_v2_enabled?
@@ -41,6 +43,10 @@ module AutoAssignmentHandler
   def legacy_allowed_agent_ids
     # If conversation has a team, only consider team members for assignment
     team_id.present? ? team_member_ids_with_capacity : inbox.member_ids_with_assignment_capacity
+  end
+
+  def nuevo_pendiente_con_bot?
+    saved_change_to_id? && pending? && inbox.agent_bot_inbox&.active?
   end
 
   def conversation_status_changed_to_resolved_or_snoozed?

@@ -87,6 +87,8 @@ async function contar() {
 }
 
 async function abrir(c) {
+  // Tocar otra vez la carpeta abierta = volver a tus chats (Mías / Sin asignar / Todos), pedido de Wendy 23/10
+  if (activa(c)) { router.push(frontendURL(`accounts/${accountId.value}/dashboard`)); return; }
   let v = carpetaDe(c);
   if (!v) {
     try {

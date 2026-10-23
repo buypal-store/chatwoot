@@ -11,13 +11,15 @@ import { useMapGetter } from 'dashboard/composables/store.js';
 import ConversationApi from 'dashboard/api/inbox/conversation';
 import { frontendURL } from 'dashboard/helper/URLHelper';
 
+// (22/10 noche) Las carpetas filtran por las etiquetas que pone el agente (ia-asesor / ia-atiende / ia-pedido), no por la
+// prioridad ni el estado a secas: una automatización antigua pone "Urgente" a muchos chats y hay pendientes de meses.
 const CARPETAS = [
   { clave: 'ayuda', nombre: '🔴 Necesita un asesor', fondo: '#fee2e2', texto: '#991b1b',
-    cond: [['priority', 'equal_to', ['urgent']]] },
+    cond: [['labels', 'equal_to', ['ia-asesor']], ['status', 'equal_to', ['open']]] },
   { clave: 'atendiendo', nombre: '🟡 Atendiendo', fondo: '#fef9c3', texto: '#854d0e',
-    cond: [['status', 'equal_to', ['pending']]] },
+    cond: [['labels', 'equal_to', ['ia-atiende']], ['status', 'equal_to', ['pending']]] },
   { clave: 'tomados', nombre: '🟢 Pedidos tomados', fondo: '#dcfce7', texto: '#166534',
-    cond: [['priority', 'equal_to', ['high']]], burbuja: true },
+    cond: [['labels', 'equal_to', ['ia-pedido']], ['status', 'equal_to', ['open']]], burbuja: true },
 ];
 const ES_PRUEBAS = /pruebas/.test(window.location.host);
 const ERP = 'https://erp.buypal.com.pe/api/agentesIA?resumen=1&fuente=' + (ES_PRUEBAS ? 'pruebas' : 'produccion');
@@ -86,6 +88,12 @@ async function abrir(c) {
       console.warn('Agente Buypal: no se pudo crear la carpeta', e && e.message);
       return;
     }
+  }
+  // Carpeta creada con una versión anterior: se actualiza al filtro de ahora (una vez)
+  const firma = p => JSON.stringify((p || []).map(x => [x.attribute_key, x.filter_operator, (x.values || []).map(String)]));
+  if (v && firma((v.query || {}).payload) !== firma(consulta(c).payload)) {
+    try { await store.dispatch('customViews/update', { id: v.id, name: v.name, filter_type: 0, query: consulta(c) }); }
+    catch (e) { console.warn('Agente Buypal: no se pudo actualizar la carpeta', e && e.message); }
   }
   if (v) router.push(frontendURL(`accounts/${accountId.value}/custom_view/${v.id}`));
 }

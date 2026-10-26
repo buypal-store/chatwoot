@@ -9,17 +9,17 @@ const props = defineProps({
   chat: { type: Object, required: true },
 });
 const BANDEJAS = [5, 8, 119];   // Sento WhatsApp (5 y 8) y la bandeja de pruebas
-const NOTA_OFF = '⏸️ Peldaño apagado en este chat (#pausa)';
-const NOTA_ON = '▶️ Peldaño prendido en este chat (#peldaño)';
+const NOTA_OFF = '⏸️ Robot apagado en este chat (#pausa)';
+const NOTA_ON = '▶️ Robot prendido en este chat (#agente)';
 const enviando = ref(false);
 const forzado = ref(null);   // estado recién cambiado, mientras llega la nota
 
 const visible = computed(() => BANDEJAS.includes(Number(props.chat?.inbox_id)));
 const prendido = computed(() => {
   if (forzado.value !== null) return forzado.value;
-  const notas = (props.chat?.messages || []).filter(m => m.private && /#\s*pausa|tom[oóeé] el control|#\s*pelda[ñn]o/i.test(m.content || ''));
+  const notas = (props.chat?.messages || []).filter(m => m.private && /#\s*pausa|tom[oóeé] el control|#\s*pelda[ñn]o|#\s*agente/i.test(m.content || ''));
   const ultima = notas[notas.length - 1];
-  return !ultima || /#\s*pelda[ñn]o/i.test(ultima.content || '');
+  return !ultima || /#\s*pelda[ñn]o|#\s*agente/i.test(ultima.content || '');
 });
 
 async function cambiar() {
@@ -43,9 +43,9 @@ async function cambiar() {
     class="inline-flex items-center min-w-0 gap-1.5 transition-all duration-100 ease-out border-0 rounded-lg outline-1 outline h-8 px-3 text-sm justify-center disabled:opacity-50"
     :style="prendido ? { background: '#dcfce7', color: '#166534', outlineColor: '#86efac' } : { background: '#f3f4f6', color: '#4b5563', outlineColor: '#d1d5db' }"
     :disabled="enviando"
-    :title="prendido ? 'Peldaño atiende este chat. Clic para apagarlo aquí' : 'Peldaño apagado en este chat. Clic para prenderlo'"
+    :title="prendido ? 'El robot atiende este chat. Clic para apagarlo aquí' : 'Robot apagado en este chat. Clic para prenderlo'"
     @click="cambiar"
   >
-    🤖 {{ prendido ? 'Peldaño ON' : 'Peldaño OFF' }}
+    🤖 {{ prendido ? 'Robot ON' : 'Robot OFF' }}
   </button>
 </template>

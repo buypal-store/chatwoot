@@ -14,8 +14,8 @@ export function useOrderedMacros() {
 
   // Buypal (23/10, Wendy: "que salgan arriba a la mano"): Apagar/Prender Peldaño siempre primero, para todos
   const primeroPeldano = list => [
-    ...list.filter(m => /pelda[ñn]o/i.test(m.name || '')),
-    ...list.filter(m => !/pelda[ñn]o/i.test(m.name || '')),
+    ...list.filter(m => /pelda[ñn]o|robot/i.test(m.name || '')),
+    ...list.filter(m => !/pelda[ñn]o|robot/i.test(m.name || '')),
   ];
 
   const orderedMacros = computed({

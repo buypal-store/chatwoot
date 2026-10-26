@@ -15,12 +15,13 @@ import { frontendURL } from 'dashboard/helper/URLHelper';
 // prioridad ni el estado a secas: una automatización antigua pone "Urgente" a muchos chats y hay pendientes de meses.
 const CARPETAS = [
   { clave: 'ayuda', nombre: '🔴 Necesita un asesor', punto: '#ef4444', uno: 'pendiente', varios: 'pendientes',
-    cond: [['labels', 'equal_to', ['ia-asesor']], ['status', 'equal_to', ['open']]] },
+    // (26/10, Wendy) 🔴 y 🟢 solo con prioridad: si el asesor ya abrió el chat y le quitó la prioridad, sale de la carpeta
+    cond: [['labels', 'equal_to', ['ia-asesor']], ['status', 'equal_to', ['open']], ['priority', 'equal_to', ['urgent', 'high']]] },
   { clave: 'atendiendo', nombre: '🟡 Atendiendo', punto: '#facc15', uno: 'atendiendo', varios: 'atendiendo',
     // (26/10, Wendy) el agente deja sus chats en "Abierto" para que también salgan abajo en "Mías"; los viejos siguen Pendiente
     cond: [['labels', 'equal_to', ['ia-atiende']], ['status', 'equal_to', ['open', 'pending']]] },
   { clave: 'tomados', nombre: '🟢 Pedidos tomados', punto: '#22c55e', uno: 'pedido', varios: 'pedidos',
-    cond: [['labels', 'equal_to', ['ia-pedido']], ['status', 'equal_to', ['open']]] },
+    cond: [['labels', 'equal_to', ['ia-pedido']], ['status', 'equal_to', ['open']], ['priority', 'equal_to', ['urgent', 'high']]] },
 ];
 const ES_PRUEBAS = /pruebas/.test(window.location.host);
 const ERP = 'https://erp.buypal.com.pe/api/agentesIA?resumen=1&fuente=' + (ES_PRUEBAS ? 'pruebas' : 'produccion');

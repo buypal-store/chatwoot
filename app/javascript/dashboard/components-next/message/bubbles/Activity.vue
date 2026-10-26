@@ -11,8 +11,11 @@ const readableTime = computed(() =>
 );
 // Buypal (23/10, Wendy: "tantas letras plomas marea"): no se muestran los avisos que deja el Agente Buypal (estado,
 // etiquetas ia-*, reapertura por demora del bot). Siguen guardados; solo no se dibujan.
+// (26/10) También las del robot en pruebas "(IA …)" y las de la automatización que pone y quita la prioridad sola.
 const oculto = computed(() =>
-  /Agente Buypal|agent bot|\bia-(atiende|asesor|pedido)\b/i.test(content.value || '')
+  /Agente Buypal|agent bot|\(IA [^)]*\)|Automation System|\bia-(atiende|asesor|pedido)\b/i.test(
+    content.value || ''
+  )
 );
 </script>
 

@@ -1,8 +1,8 @@
 <script setup>
 // Agente Buypal (22/10/2026, pedido de Wendy): cajita arriba de "Mías / Sin asignar / Todos" con las 3 carpetas del
 // agente IA de ventas. Un clic abre la carpeta (filtro guardado del usuario; si no la tiene, se le crea una vez).
-// La lista de abajo NO cambia. Los chats que atiende el agente quedan en estado "Pendiente", por eso no salen en
-// "Mías" ni en "No contestados"; los que necesitan a una persona pasan a "Abierto" con prioridad Urgente o Alta.
+// La lista de abajo NO cambia. Desde el 26/10 los chats que atiende el agente quedan "Abiertos": salen también abajo en
+// "Mías" (pedido de los asesores); los que necesitan a una persona llevan prioridad Urgente o Alta.
 // Números: en producción vienen del ERP (no se le pregunta a Chatwoot, cuidar el CPU); en pruebas, del filtro de Chatwoot.
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useStore } from 'vuex';
@@ -17,7 +17,8 @@ const CARPETAS = [
   { clave: 'ayuda', nombre: '🔴 Necesita un asesor', punto: '#ef4444', uno: 'pendiente', varios: 'pendientes',
     cond: [['labels', 'equal_to', ['ia-asesor']], ['status', 'equal_to', ['open']]] },
   { clave: 'atendiendo', nombre: '🟡 Atendiendo', punto: '#facc15', uno: 'atendiendo', varios: 'atendiendo',
-    cond: [['labels', 'equal_to', ['ia-atiende']], ['status', 'equal_to', ['pending']]] },
+    // (26/10, Wendy) el agente deja sus chats en "Abierto" para que también salgan abajo en "Mías"; los viejos siguen Pendiente
+    cond: [['labels', 'equal_to', ['ia-atiende']], ['status', 'equal_to', ['open', 'pending']]] },
   { clave: 'tomados', nombre: '🟢 Pedidos tomados', punto: '#22c55e', uno: 'pedido', varios: 'pedidos',
     cond: [['labels', 'equal_to', ['ia-pedido']], ['status', 'equal_to', ['open']]] },
 ];
@@ -32,7 +33,7 @@ const carpetas = useMapGetter('customViews/getConversationCustomViews');
 const numeros = ref({});
 const latido = ref({});            // fila que acaba de subir de número: un solo pulso suave (no parpadea)
 // Recordatorio de los primeros días: "lo del agente está en estas carpetas". Se cierra con ✕ y no vuelve a salir.
-const LLAVE_AVISO = 'agente_buypal_aviso_visto';
+const LLAVE_AVISO = 'agente_buypal_aviso_visto_2610';   // aviso nuevo del 26/10: vuelve a salir una vez
 const verAviso = ref(false);
 try { verAviso.value = localStorage.getItem(LLAVE_AVISO) !== '1'; } catch (e) { verAviso.value = false; }
 const cerrarAviso = () => {
@@ -146,7 +147,7 @@ onBeforeUnmount(() => clearInterval(reloj));
       v-if="verAviso && !plegada"
       class="flex items-start gap-2 rounded-lg mt-1.5 px-2.5 py-1.5 text-xs text-n-slate-11 bg-n-alpha-1"
     >
-      <span class="flex-1">💡 Lo que atiende el agente no sale en "Mías": está aquí. 🔴 y 🟢 te necesitan.</span>
+      <span class="flex-1">💡 Revisa primero aquí: 🔴 y 🟢 te necesitan. Dentro de cada carpeta puedes ver solo los tuyos o todos.</span>
       <button class="opacity-60" title="Entendido" @click="cerrarAviso">✕</button>
     </div>
   </div>

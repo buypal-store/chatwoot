@@ -167,6 +167,40 @@ const hasAppliedFiltersOrActiveFolders = computed(() => {
   return hasAppliedFilters.value || hasActiveFolders.value;
 });
 
+// Buypal (26/10, Wendy): dentro de las carpetas del Agente Buypal (el semáforo) cada asesor elige ver solo sus chats o
+// todos, y la lista va del más reciente al más antiguo. Se filtra sobre lo ya cargado: cero consultas extra a Chatwoot.
+const CARPETAS_AGENTE = ['🔴 Necesita un asesor', '🟡 Atendiendo', '🟢 Pedidos tomados'];
+const esCarpetaAgente = computed(
+  () => hasActiveFolders.value && CARPETAS_AGENTE.includes(activeFolderName.value)
+);
+const LLAVE_TAB_CARPETA = 'agente_buypal_tab_carpeta';
+const tabCarpeta = ref(wootConstants.ASSIGNEE_TYPE.ALL);
+try {
+  tabCarpeta.value =
+    localStorage.getItem(LLAVE_TAB_CARPETA) || wootConstants.ASSIGNEE_TYPE.ALL;
+} catch (e) {
+  tabCarpeta.value = wootConstants.ASSIGNEE_TYPE.ALL;
+}
+function filtrarPorTabCarpeta(conversations, tab) {
+  if (tab === wootConstants.ASSIGNEE_TYPE.ME) {
+    return conversations.filter(
+      c => c.meta?.assignee?.id === currentUser.value?.id
+    );
+  }
+  if (tab === wootConstants.ASSIGNEE_TYPE.UNASSIGNED) {
+    return conversations.filter(c => !c.meta?.assignee);
+  }
+  return conversations;
+}
+function cambiarTabCarpeta(tab) {
+  tabCarpeta.value = tab;
+  try {
+    localStorage.setItem(LLAVE_TAB_CARPETA, tab);
+  } catch (e) {
+    // Sin localStorage la pestaña funciona igual, solo no se recuerda
+  }
+}
+
 const currentUserDetails = computed(() => {
   const { id, name } = currentUser.value;
   return { id, name };
@@ -347,6 +381,13 @@ const conversationList = computed(() => {
     });
   }
 
+  if (esCarpetaAgente.value) {
+    localConversationList = filtrarPorTabCarpeta(
+      localConversationList,
+      tabCarpeta.value
+    ).sort((a, b) => (b.last_activity_at || 0) - (a.last_activity_at || 0));
+  }
+
   if (
     !hasAppliedFiltersOrActiveFolders.value &&
     activeSortBy.value === wootConstants.SORT_BY_TYPE.UNREAD
@@ -364,6 +405,22 @@ const conversationList = computed(() => {
   }
 
   return localConversationList;
+});
+
+// Pestañas de la carpeta del agente, con cuántos chats hay en cada una (de lo cargado)
+const tabsCarpetaItems = computed(() => {
+  if (!esCarpetaAgente.value) return [];
+  const { payload } = activeFolder.value.query;
+  const enCarpeta = chatLists.value.filter(c => matchesFilters(c, payload));
+  return [
+    wootConstants.ASSIGNEE_TYPE.ME,
+    wootConstants.ASSIGNEE_TYPE.UNASSIGNED,
+    wootConstants.ASSIGNEE_TYPE.ALL,
+  ].map(key => ({
+    key,
+    name: t(`CHAT_LIST.ASSIGNEE_TYPE_TABS.${key}`),
+    count: filtrarPorTabCarpeta(enCarpeta, key).length,
+  }));
 });
 
 const showEndOfListMessage = computed(() => {
@@ -1034,6 +1091,13 @@ watch(conversationFilters, (newVal, oldVal) => {
       :active-tab="activeAssigneeTab"
       is-compact
       @chat-tab-change="updateAssigneeTab"
+    />
+    <ChatTypeTabs
+      v-else-if="esCarpetaAgente"
+      :items="tabsCarpetaItems"
+      :active-tab="tabCarpeta"
+      is-compact
+      @chat-tab-change="cambiarTabCarpeta"
     />
 
     <p

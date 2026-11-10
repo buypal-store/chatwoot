@@ -2,7 +2,8 @@ class AutoAssignment::AgentAssignmentService
   pattr_initialize [:conversation!, :allowed_agent_ids!]
 
   PRESENCE_GRACE      = 5.minutes
-  ASSIGNABLE_STATUSES = %w[online busy].freeze
+  # Wendy 10/11: chats nuevos solo a asesores "En linea"; Ocupado y Desconectado no reciben (los que ya tienen se quedan)
+  ASSIGNABLE_STATUSES = %w[online].freeze
 
   def find_assignee
     round_robin_manage_service.available_agent(allowed_agent_ids: allowed_online_agent_ids)
@@ -75,7 +76,7 @@ class AutoAssignment::AgentAssignmentService
 
     AccountUser.where(account_id: conversation.account_id,
                       user_id: candidate_ids,
-                      availability: :offline)
+                      availability: %i[offline busy])
                .pluck(:user_id).map(&:to_s)
   rescue StandardError => e
     Rails.logger.error("[StrictRR] offline check fallo: #{e.message}")

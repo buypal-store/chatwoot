@@ -15,7 +15,10 @@ DeviseTokenAuth.setup do |config|
 
   # Sets the max number of concurrent devices per user, which is 10 by default.
   # After this limit is reached, the oldest tokens will be removed.
-  config.max_number_of_devices = 25
+  # Buypal (Wendy 14/11): una sola sesión abierta por usuario. Al entrar en otro
+  # dispositivo se borra la sesión anterior y ese dispositivo vuelve al login.
+  # No afecta los tokens de API (bots, n8n, scripts), que son otra tabla.
+  config.max_number_of_devices = 1
 
   # Sometimes it's necessary to make several requests to the API at the same
   # time. In this case, each request in the batch will need to share the same

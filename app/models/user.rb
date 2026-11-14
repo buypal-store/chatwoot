@@ -218,7 +218,15 @@ class User < ApplicationRecord
 
   def sync_user_sessions
     active_client_ids = (tokens || {}).keys
-    user_sessions.where.not(client_id: active_client_ids).destroy_all
+    cerradas = user_sessions.where.not(client_id: active_client_ids).to_a
+    return if cerradas.empty?
+
+    # Buypal (Wendy 14/11): si en este mismo guardado entró un token nuevo, la sesión vieja se cerró
+    # porque el agente ingresó en otro dispositivo; si no, salió (o venció). Se avisa al ERP antes de borrar.
+    previas = (attribute_before_last_save('tokens') || {}).keys
+    motivo = (active_client_ids - previas).any? ? 'cerrada_por_otro_ingreso' : 'salida'
+    cerradas.each { |s| BuypalAvisoSesionService.avisar(self, s, motivo) }
+    user_sessions.where(id: cerradas.map(&:id)).destroy_all
   end
 
   def remove_macros

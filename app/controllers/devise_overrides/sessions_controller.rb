@@ -223,11 +223,13 @@ class DeviseOverrides::SessionsController < DeviseTokenAuth::SessionsController
     client_id = @token&.try(:client) || response.headers['client']
     return unless client_id.present? && @resource.present?
 
-    UserSessionTrackingService.new(
+    session = UserSessionTrackingService.new(
       user: @resource,
       request: request,
       client_id: client_id
     ).create_or_update!
+    # Buypal: aviso de ingreso al ERP (con 20 s para que llegue la ciudad)
+    BuypalAvisoIngresoJob.set(wait: 20.seconds).perform_later(session.id) if session
   rescue StandardError => e
     Rails.logger.warn "Session tracking failed: #{e.message}"
   end

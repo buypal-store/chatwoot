@@ -23,6 +23,10 @@ class UserSessionTrackingService
 
   def update_activity!
     session = @user.user_sessions.find_by(client_id: @client_id)
+    # Buypal (Wendy 15/11): sesión abierta antes del corte de la sesión única → se cierra en segundo plano
+    if BuypalCerrarSesionAntiguaJob.antigua?(session)
+      return BuypalCerrarSesionAntiguaJob.perform_later(@user.id, @client_id, session_attributes.transform_keys(&:to_s))
+    end
     return unless session&.should_update_activity?
 
     session.update_columns(last_activity_at: Time.current) # rubocop:disable Rails/SkipsModelValidations

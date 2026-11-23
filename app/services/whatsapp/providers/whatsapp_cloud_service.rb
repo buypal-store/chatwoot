@@ -186,11 +186,72 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
   end
 
   def build_attachment_content(type, attachment, message)
-    type_content = { 'link' => attachment.download_url }
+    media_id = upload_media_to_meta(type, attachment)
+    type_content = media_id.present? ? { 'id' => media_id } : { 'link' => attachment.download_url }
     type_content['caption'] = message.outgoing_content unless %w[audio sticker].include?(type)
     type_content['filename'] = attachment.file.filename if type == 'document'
     type_content['voice'] = true if voice_message?(type, attachment)
     type_content
+  end
+
+  # BuyPal (22-nov-2026): con 'link' Meta tiene que venir a bajar el archivo de storage.buypal.com.pe y a veces no
+  # viene (131053 "Media upload error": en 107 de 123 fallos Meta nunca pidió el archivo). Subimos el archivo a Meta
+  # (/media) y enviamos con su id. Solo los formatos que Meta documenta para cada tipo; el resto (webp, apk, xml...)
+  # sigue por link como antes. Si la subida falla por cualquier motivo devolvemos nil y también va por link.
+  # Apagar sin cambiar código: WHATSAPP_SUBIR_MEDIA=false en el entorno de chatwoot y sidekiq.
+  META_UPLOAD_CONTENT_TYPES = {
+    'image' => %w[image/jpeg image/png],
+    'video' => %w[video/mp4 video/3gpp],
+    'audio' => %w[audio/aac audio/amr audio/mpeg audio/mp4 audio/ogg],
+    'document' => %w[application/pdf text/plain application/msword application/vnd.ms-excel application/vnd.ms-powerpoint
+                     application/vnd.openxmlformats-officedocument.wordprocessingml.document
+                     application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+                     application/vnd.openxmlformats-officedocument.presentationml.presentation]
+  }.freeze
+  META_UPLOAD_MAX_BYTES = 25.megabytes
+
+  def upload_media_to_meta(type, attachment)
+    return if ENV.fetch('WHATSAPP_SUBIR_MEDIA', 'true') == 'false'
+    return unless attachment.file.attached?
+
+    blob = attachment.file.blob
+    return unless META_UPLOAD_CONTENT_TYPES.fetch(type, []).include?(blob.content_type)
+    return if blob.byte_size.to_i > META_UPLOAD_MAX_BYTES
+
+    media_id = nil
+    blob.open do |file|
+      response = HTTParty.post(
+        "#{phone_id_path('v24.0')}/media",
+        headers: { 'Authorization' => "Bearer #{whatsapp_channel.provider_config['api_key']}" },
+        multipart: true,
+        body: { messaging_product: 'whatsapp', type: blob.content_type, file: MetaUploadFile.new(file, blob) },
+        # HTTParty 0.24.0 en modo streaming omite la línea en blanco tras la cabecera de los campos de texto
+        # (messaging_product, type) y Meta responde "(#100) The parameter file is required". Sin streaming el
+        # formulario sale bien; el archivo cabe en memoria (tope META_UPLOAD_MAX_BYTES).
+        stream_body: false,
+        timeout: 60
+      )
+      media_id = response.parsed_response['id'].presence if response.success? && response.parsed_response.is_a?(Hash)
+      if media_id.blank?
+        Rails.logger.warn "[WHATSAPP] Subida a Meta falló (blob #{blob.id}, #{blob.byte_size} B): " \
+                          "#{response.code} #{error_message(response)}; se envía por link"
+      end
+    end
+    media_id
+  rescue StandardError => e
+    Rails.logger.warn "[WHATSAPP] Subida a Meta falló (#{e.class}: #{e.message}); se envía por link"
+    nil
+  end
+
+  # El archivo temporal de ActiveStorage con el tipo y el nombre del blob (HTTParty los usa en la parte 'file').
+  class MetaUploadFile < SimpleDelegator
+    attr_reader :content_type, :original_filename
+
+    def initialize(file, blob)
+      super(file)
+      @content_type = blob.content_type
+      @original_filename = blob.filename.to_s.encode('ASCII', invalid: :replace, undef: :replace, replace: '_')
+    end
   end
 
   def template_body_parameters(template_info)

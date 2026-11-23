@@ -29,6 +29,10 @@ describe Whatsapp::Providers::WhatsappCloudService do
 
   before do
     stub_request(:get, 'https://graph.facebook.com/v14.0/123456789/message_templates?access_token=test_key')
+    # BuyPal: los adjuntos se suben primero a Meta (/media). Por defecto esa subida falla y se envía por link,
+    # que es lo que verifican los ejemplos de adjuntos de abajo; el camino con media id tiene su propio ejemplo.
+    stub_request(:post, 'https://graph.facebook.com/v24.0/123456789/media')
+      .to_return(status: 500, body: { error: { message: 'stub' } }.to_json, headers: { 'Content-Type' => 'application/json' })
   end
 
   describe '#send_message' do
@@ -80,6 +84,41 @@ describe Whatsapp::Providers::WhatsappCloudService do
           )
           .to_return(status: 200, body: whatsapp_response.to_json, headers: response_headers)
         expect(service.send_message('+123456789', message)).to eq 'message_id'
+      end
+
+      it 'uploads the attachment to Meta and sends it by media id' do
+        attachment = message.attachments.new(account_id: message.account_id, file_type: :image)
+        attachment.file.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'avatar.png', content_type: 'image/png')
+        attachment.save! # sin guardar, ActiveStorage aún no sube el archivo y no habría qué leer para Meta
+
+        upload = stub_request(:post, 'https://graph.facebook.com/v24.0/123456789/media')
+                 .with do |request|
+                   request.body.include?("name=\"messaging_product\"\r\n\r\nwhatsapp") &&
+                     request.body.include?("name=\"type\"\r\n\r\nimage/png") &&
+                     request.body.include?("name=\"file\"; filename=\"avatar.png\"\r\nContent-Type: image/png\r\n\r\n")
+                 end
+                 .to_return(status: 200, body: { id: 'media_123' }.to_json, headers: response_headers)
+        by_id = stub_request(:post, 'https://graph.facebook.com/v24.0/123456789/messages')
+                .with(body: hash_including({ type: 'image', image: { 'id' => 'media_123', 'caption' => message.content } }))
+                .to_return(status: 200, body: whatsapp_response.to_json, headers: response_headers)
+
+        expect(service.send_message('+123456789', message)).to eq 'message_id'
+        expect(upload).to have_been_requested
+        expect(by_id).to have_been_requested
+      end
+
+      it 'does not upload formats Meta does not document for the type (webp image goes by link)' do
+        attachment = message.attachments.new(account_id: message.account_id, file_type: :image)
+        attachment.file.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'avatar.webp', content_type: 'image/webp',
+                               identify: false)
+        attachment.save!
+
+        stub_request(:post, 'https://graph.facebook.com/v24.0/123456789/messages')
+          .with(body: hash_including({ type: 'image', image: WebMock::API.hash_including({ link: anything }) }))
+          .to_return(status: 200, body: whatsapp_response.to_json, headers: response_headers)
+
+        expect(service.send_message('+123456789', message)).to eq 'message_id'
+        expect(a_request(:post, 'https://graph.facebook.com/v24.0/123456789/media')).not_to have_been_made
       end
 
       it 'calls message endpoints for document attachment message messages' do
